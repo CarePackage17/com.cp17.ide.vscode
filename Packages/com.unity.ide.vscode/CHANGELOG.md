@@ -3,6 +3,7 @@
 ## [2.0.0] - Unreleased
 
 Move to generating SDK-style projects
+*Support for full framework projects has been removed*
 
 ## [1.2.3] - 2020-10-23
 

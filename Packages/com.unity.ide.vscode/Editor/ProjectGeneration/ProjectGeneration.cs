@@ -106,9 +106,8 @@ namespace VSCodeEditor
             { "raytrace", ScriptingLanguage.None }
         };
 
-        readonly string m_SolutionProjectEntryTemplate = string.Join("\r\n", "Project(\"{{{0}}}\") = \"{1}\", \"{2}\", \"{{{3}}}\"", "EndProject");
-
-        readonly string m_SolutionProjectConfigurationTemplate = string.Join("\r\n", @"        {{{0}}}.Debug|Any CPU.ActiveCfg = Debug|Any CPU", @"        {{{0}}}.Debug|Any CPU.Build.0 = Debug|Any CPU").Replace("    ", "\t");
+        const string SlnProjectEntryTemplate = "Project(\"{{{0}}}\") = \"{1}\", \"{2}\", \"{{{3}}}\"" + "\r\n" + "EndProject";
+        const string SlnProjectConfigurationTemplate = "\t\t" + @"{{{0}}}.Debug|Any CPU.ActiveCfg = Debug|Any CPU" + "\r\n\t\t" + "{{{0}}}.Debug|Any CPU.Build.0 = Debug|Any CPU";
 
         static readonly string[] k_ReimportSyncExtensions = { ".dll", ".asmdef" };
 
@@ -199,7 +198,15 @@ namespace VSCodeEditor
 
         static bool ShouldSyncOnReimportedAsset(string asset)
         {
-            return k_ReimportSyncExtensions.Contains(new FileInfo(asset).Extension);
+            ReadOnlySpan<char> extension = Path.GetExtension(asset.AsSpan());
+            
+            if (extension.Equals(".dll".AsSpan(), StringComparison.InvariantCultureIgnoreCase) ||
+                extension.Equals(".asmdef".AsSpan(), StringComparison.InvariantCultureIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
         }
 
         static IEnumerable<SR.MethodInfo> GetPostProcessorCallbacks(string name)
@@ -817,7 +824,7 @@ namespace VSCodeEditor
         string GetProjectEntries(IEnumerable<Assembly> assemblies)
         {
             var projectEntries = assemblies.Select(i => string.Format(
-                m_SolutionProjectEntryTemplate,
+                SlnProjectEntryTemplate,
                 m_GUIDProvider.SolutionGuid,
                 i.name,
                 Path.GetFileName(ProjectFile(i)),
@@ -833,7 +840,7 @@ namespace VSCodeEditor
         string GetProjectActiveConfigurations(string projectGuid)
         {
             return string.Format(
-                m_SolutionProjectConfigurationTemplate,
+                SlnProjectConfigurationTemplate,
                 projectGuid);
         }
 
