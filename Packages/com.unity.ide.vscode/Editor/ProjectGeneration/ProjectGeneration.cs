@@ -416,7 +416,7 @@ namespace VSCodeEditor
             List<ResponseFileData> responseFilesData)
         {
             SyncProjectFileIfNotChanged(
-                ProjectFile(assembly), 
+                ProjectFile(assembly),
                 // ProjectText(assembly, allAssetsProjectParts, responseFilesData)
                 ProjectText2(assembly, allAssetsProjectParts, responseFilesData)
             );
@@ -482,12 +482,22 @@ namespace VSCodeEditor
             {
                 references.AddRange(thing.FullPathReferences);
             }
-            
-            var internalAssemblyReferences = assembly.assemblyReferences
-              .Where(i => !i.sourceFiles.Any(ShouldFileBePartOfSolution)).Select(i => i.outputPath);
+
+            // var internalAssemblyReferences = assembly.assemblyReferences
+            //   .Where(i => !i.sourceFiles.Any(ShouldFileBePartOfSolution)).Select(i => i.outputPath);
+            foreach (var thing in assembly.assemblyReferences)
+            {
+                foreach (var file in thing.sourceFiles)
+                {
+                    if (!ShouldFileBePartOfSolution(file))
+                    {
+                        references.Add(thing.outputPath);
+                        break;
+                    }
+                }
+            }
 
             references.AddRange(assembly.compiledAssemblyReferences);
-            references.AddRange(internalAssemblyReferences);
             var allReferences = references;
 
             foreach (var reference in allReferences)
@@ -500,12 +510,28 @@ namespace VSCodeEditor
             {
                 m_projectFileBuilder.Append("  </ItemGroup>").Append(k_WindowsNewline);
                 m_projectFileBuilder.Append("  <ItemGroup>").Append(k_WindowsNewline);
-                foreach (Assembly reference in assembly.assemblyReferences.Where(i => i.sourceFiles.Any(ShouldFileBePartOfSolution)))
+
+                // foreach (Assembly reference in assembly.assemblyReferences.Where(i => i.sourceFiles.Any(ShouldFileBePartOfSolution)))
+                // {
+                //     m_projectFileBuilder.Append("    <ProjectReference Include=\"").Append(reference.name).Append(GetProjectExtension()).Append("\">").Append(k_WindowsNewline);
+                //     m_projectFileBuilder.Append("      <Project>{").Append(ProjectGuid(reference.name)).Append("}</Project>").Append(k_WindowsNewline);
+                //     m_projectFileBuilder.Append("      <Name>").Append(reference.name).Append("</Name>").Append(k_WindowsNewline);
+                //     m_projectFileBuilder.Append("    </ProjectReference>").Append(k_WindowsNewline);
+                // }
+
+                foreach (Assembly reference in assembly.assemblyReferences)
                 {
-                    m_projectFileBuilder.Append("    <ProjectReference Include=\"").Append(reference.name).Append(GetProjectExtension()).Append("\">").Append(k_WindowsNewline);
-                    m_projectFileBuilder.Append("      <Project>{").Append(ProjectGuid(reference.name)).Append("}</Project>").Append(k_WindowsNewline);
-                    m_projectFileBuilder.Append("      <Name>").Append(reference.name).Append("</Name>").Append(k_WindowsNewline);
-                    m_projectFileBuilder.Append("    </ProjectReference>").Append(k_WindowsNewline);
+                    foreach (var file in reference.sourceFiles)
+                    {
+                        if (ShouldFileBePartOfSolution(file))
+                        {
+                            m_projectFileBuilder.Append("    <ProjectReference Include=\"").Append(reference.name).Append(GetProjectExtension()).Append("\">").Append(k_WindowsNewline);
+                            m_projectFileBuilder.Append("      <Project>{").Append(ProjectGuid(reference.name)).Append("}</Project>").Append(k_WindowsNewline);
+                            m_projectFileBuilder.Append("      <Name>").Append(reference.name).Append("</Name>").Append(k_WindowsNewline);
+                            m_projectFileBuilder.Append("    </ProjectReference>").Append(k_WindowsNewline);
+                            break;
+                        }
+                    }
                 }
             }
 
