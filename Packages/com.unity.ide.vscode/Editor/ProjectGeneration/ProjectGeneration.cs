@@ -118,6 +118,10 @@ namespace VSCodeEditor
         public string ProjectDirectory { get; }
         IAssemblyNameProvider IGenerator.AssemblyNameProvider => m_AssemblyNameProvider;
 
+        //capacity is specified in chars, char is 2 bytes.
+        //let's use a 2MiB buffer for starters.
+        StringBuilder m_projectFileBuilder = new(capacity: sizeof(char) * 2 * 1024 * 1024);
+
         public void GenerateAll(bool generateAll)
         {
             m_AssemblyNameProvider.ToggleProjectGeneration(
@@ -457,19 +461,20 @@ namespace VSCodeEditor
             Dictionary<string, string> allAssetsProjectParts,
             List<ResponseFileData> responseFilesData)
         {
-            var projectBuilder = new StringBuilder();
-            ProjectHeader(assembly, responseFilesData, projectBuilder);
+            m_projectFileBuilder.Clear();
+            
+            ProjectHeader(assembly, responseFilesData, m_projectFileBuilder);
             var references = new List<string>();
 
             foreach (string file in assembly.sourceFiles)
             {
                 var fullFile = m_FileIOProvider.EscapedRelativePathFor(file, ProjectDirectory);
-                projectBuilder.Append("     <Compile Include=\"").Append(fullFile).Append("\" />").Append(k_WindowsNewline);
+                m_projectFileBuilder.Append("     <Compile Include=\"").Append(fullFile).Append("\" />").Append(k_WindowsNewline);
             }
 
             // Append additional non-script files that should be included in project generation.
             if (allAssetsProjectParts.TryGetValue(assembly.name, out var additionalAssetsForProject))
-                projectBuilder.Append(additionalAssetsForProject);
+                m_projectFileBuilder.Append(additionalAssetsForProject);
 
             var responseRefs = responseFilesData.SelectMany(x => x.FullPathReferences.Select(r => r));
             var internalAssemblyReferences = assembly.assemblyReferences
@@ -483,24 +488,24 @@ namespace VSCodeEditor
             foreach (var reference in allReferences)
             {
                 string fullReference = Path.IsPathRooted(reference) ? reference : Path.Combine(ProjectDirectory, reference);
-                AppendReference(fullReference, projectBuilder);
+                AppendReference(fullReference, m_projectFileBuilder);
             }
 
             if (0 < assembly.assemblyReferences.Length)
             {
-                projectBuilder.Append("  </ItemGroup>").Append(k_WindowsNewline);
-                projectBuilder.Append("  <ItemGroup>").Append(k_WindowsNewline);
+                m_projectFileBuilder.Append("  </ItemGroup>").Append(k_WindowsNewline);
+                m_projectFileBuilder.Append("  <ItemGroup>").Append(k_WindowsNewline);
                 foreach (Assembly reference in assembly.assemblyReferences.Where(i => i.sourceFiles.Any(ShouldFileBePartOfSolution)))
                 {
-                    projectBuilder.Append("    <ProjectReference Include=\"").Append(reference.name).Append(GetProjectExtension()).Append("\">").Append(k_WindowsNewline);
-                    projectBuilder.Append("      <Project>{").Append(ProjectGuid(reference.name)).Append("}</Project>").Append(k_WindowsNewline);
-                    projectBuilder.Append("      <Name>").Append(reference.name).Append("</Name>").Append(k_WindowsNewline);
-                    projectBuilder.Append("    </ProjectReference>").Append(k_WindowsNewline);
+                    m_projectFileBuilder.Append("    <ProjectReference Include=\"").Append(reference.name).Append(GetProjectExtension()).Append("\">").Append(k_WindowsNewline);
+                    m_projectFileBuilder.Append("      <Project>{").Append(ProjectGuid(reference.name)).Append("}</Project>").Append(k_WindowsNewline);
+                    m_projectFileBuilder.Append("      <Name>").Append(reference.name).Append("</Name>").Append(k_WindowsNewline);
+                    m_projectFileBuilder.Append("    </ProjectReference>").Append(k_WindowsNewline);
                 }
             }
 
-            projectBuilder.Append(ProjectFooter());
-            return projectBuilder.ToString();
+            m_projectFileBuilder.Append(ProjectFooter());
+            return m_projectFileBuilder.ToString();
         }
 
         static void AppendReference(string fullReference, StringBuilder projectBuilder)
