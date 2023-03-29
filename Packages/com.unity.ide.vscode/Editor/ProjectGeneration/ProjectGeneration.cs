@@ -326,7 +326,7 @@ namespace VSCodeEditor
         {
             // Only synchronize assemblies that have associated source files and ones that we actually want in the project.
             // This also filters out DLLs coming from .asmdef files in packages.
-            var assemblies = m_AssemblyNameProvider.GetAssemblies(ShouldFileBePartOfSolution).ToArray();
+            Assembly[] assemblies = m_AssemblyNameProvider.GetAssemblies(ShouldFileBePartOfSolution).ToArray();
 
             var allAssetProjectParts = GenerateAllAssetProjectParts();
 
@@ -660,8 +660,8 @@ namespace VSCodeEditor
             var apiCompatLevel = PlayerSettings.GetApiCompatibilityLevel(btg);
             string[] systemAssemblyDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
 
-            Debug.Log($"Unity dir: {unityPath}, library dir: {libraryPath}");
-            Debug.Log($"System assembly dirs: {string.Join("\n", systemAssemblyDirs)}");
+            // Debug.Log($"Unity dir: {unityPath}, library dir: {libraryPath}");
+            // Debug.Log($"System assembly dirs: {string.Join("\n", systemAssemblyDirs)}");
 
             //might help: https://github.com/Unity-Technologies/UnityCsReference/blob/master/Editor/Mono/Scripting/ScriptCompilation/CompilationPipeline.cs/#L315
 
@@ -744,13 +744,6 @@ namespace VSCodeEditor
             return string.Format(
                 m_SolutionProjectConfigurationTemplate,
                 projectGuid);
-        }
-
-        static string SkipPathPrefix(string path, string prefix)
-        {
-            if (path.StartsWith($@"{prefix}{Path.DirectorySeparatorChar}"))
-                return path.Substring(prefix.Length + 1);
-            return path;
         }
 
         string ProjectGuid(string assembly)
