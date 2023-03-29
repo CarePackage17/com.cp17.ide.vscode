@@ -506,7 +506,12 @@ namespace VSCodeEditor
         static void AppendReference(string fullReference, StringBuilder projectBuilder)
         {
             var escapedFullPath = SecurityElement.Escape(fullReference);
-            escapedFullPath = escapedFullPath.NormalizePath();
+
+            //I wonder if this is needed now that msbuild is cross-plat...
+            //Whatever they mean by "current behavior", this will need tests:
+            //https://github.com/dotnet/msbuild/issues/1024
+            // escapedFullPath = escapedFullPath.NormalizePath();
+
             projectBuilder.Append("    <Reference Include=\"").Append(Path.GetFileNameWithoutExtension(escapedFullPath)).Append("\" />").Append(k_WindowsNewline);
         }
 
