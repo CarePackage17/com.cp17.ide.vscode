@@ -21,13 +21,21 @@ namespace VSCodeEditor
         IDiscovery m_Discoverability;
         IGenerator m_ProjectGeneration;
 
-        static readonly string[] k_SupportedFileNames = { "code.exe", "visualstudiocode.app", "visualstudiocode-insiders.app", "vscode.app", "code.app", "code.cmd", "code-insiders.cmd", "code", "com.visualstudio.code" };
+        static readonly string[] k_SupportedFileNames =
+        {
+            "code.exe",
+            "visualstudiocode.app",
+            "visualstudiocode-insiders.app",
+            "vscode.app",
+            "code.app",
+            "code.cmd",
+            "code-insiders.cmd",
+            "code",
+            "com.visualstudio.code"
+        };
 
-        static bool IsOSX => Application.platform == RuntimePlatform.OSXEditor;
-
+        const string DefaultArgument = "\"$(ProjectPath)\" -g \"$(File)\":$(Line):$(Column)";
         static string DefaultApp => EditorPrefs.GetString("kScriptsDefaultApp");
-
-        static string DefaultArgument { get; } = "\"$(ProjectPath)\" -g \"$(File)\":$(Line):$(Column)";
 
         string Arguments
         {
@@ -160,7 +168,7 @@ namespace VSCodeEditor
         public void SyncIfNeeded(string[] addedFiles, string[] deletedFiles, string[] movedFiles, string[] movedFromFiles, string[] importedFiles)
         {
             (m_ProjectGeneration.AssemblyNameProvider as IPackageInfoCache)?.ResetPackageInfoCache();
-            
+
             m_affectedFiles.Clear();
             m_affectedFiles.AddRange(addedFiles);
             m_affectedFiles.AddRange(deletedFiles);
@@ -204,7 +212,7 @@ namespace VSCodeEditor
                 }
             }
 
-            if (IsOSX)
+            if (Application.platform == RuntimePlatform.OSXEditor)
             {
                 return OpenOSX(arguments);
             }

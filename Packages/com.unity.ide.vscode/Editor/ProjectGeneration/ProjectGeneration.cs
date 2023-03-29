@@ -10,6 +10,7 @@ using UnityEditor;
 using UnityEditor.Compilation;
 using UnityEngine;
 using UnityEngine.Profiling;
+using Unity.Profiling;
 
 namespace VSCodeEditor
 {
@@ -26,6 +27,9 @@ namespace VSCodeEditor
 
     public class ProjectGeneration : IGenerator
     {
+        static ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
+        static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
+
         enum ScriptingLanguage
         {
             None,
@@ -108,8 +112,6 @@ namespace VSCodeEditor
 
         const string SlnProjectEntryTemplate = "Project(\"{{{0}}}\") = \"{1}\", \"{2}\", \"{{{3}}}\"" + "\r\n" + "EndProject";
         const string SlnProjectConfigurationTemplate = "\t\t" + @"{{{0}}}.Debug|Any CPU.ActiveCfg = Debug|Any CPU" + "\r\n\t\t" + "{{{0}}}.Debug|Any CPU.Build.0 = Debug|Any CPU";
-
-        static readonly string[] k_ReimportSyncExtensions = { ".dll", ".asmdef" };
 
         string[] m_ProjectSupportedExtensions = Array.Empty<string>();
 
@@ -199,7 +201,7 @@ namespace VSCodeEditor
         static bool ShouldSyncOnReimportedAsset(string asset)
         {
             ReadOnlySpan<char> extension = Path.GetExtension(asset.AsSpan());
-            
+
             if (extension.Equals(".dll".AsSpan(), StringComparison.InvariantCultureIgnoreCase) ||
                 extension.Equals(".asmdef".AsSpan(), StringComparison.InvariantCultureIgnoreCase))
             {
@@ -253,10 +255,13 @@ namespace VSCodeEditor
 
         public void Sync()
         {
-            SetupProjectSupportedExtensions();
-            GenerateAndWriteSolutionAndProjects();
+            using (s_syncMarker.Auto())
+            {
+                SetupProjectSupportedExtensions();
+                GenerateAndWriteSolutionAndProjects();
 
-            OnGeneratedCSProjectFiles();
+                OnGeneratedCSProjectFiles();
+            }
         }
 
         public bool SolutionExists()
@@ -330,21 +335,24 @@ namespace VSCodeEditor
 
         public void GenerateAndWriteSolutionAndProjects()
         {
-            // Only synchronize assemblies that have associated source files and ones that we actually want in the project.
-            // This also filters out DLLs coming from .asmdef files in packages.
-            Assembly[] assemblies = m_AssemblyNameProvider.GetAssemblies(ShouldFileBePartOfSolution).ToArray();
-
-            var allAssetProjectParts = GenerateAllAssetProjectParts();
-
-            SyncSolution(assemblies);
-            var allProjectAssemblies = RelevantAssembliesForMode(assemblies).ToList();
-            foreach (Assembly assembly in allProjectAssemblies)
+            using (s_genMarker.Auto())
             {
-                var responseFileData = ParseResponseFileData(assembly);
-                SyncProject(assembly, allAssetProjectParts, responseFileData);
-            }
+                // Only synchronize assemblies that have associated source files and ones that we actually want in the project.
+                // This also filters out DLLs coming from .asmdef files in packages.
+                Assembly[] assemblies = m_AssemblyNameProvider.GetAssemblies(ShouldFileBePartOfSolution).ToArray();
 
-            WriteVSCodeSettingsFiles();
+                var allAssetProjectParts = GenerateAllAssetProjectParts();
+
+                SyncSolution(assemblies);
+                var allProjectAssemblies = RelevantAssembliesForMode(assemblies).ToList();
+                foreach (Assembly assembly in allProjectAssemblies)
+                {
+                    var responseFileData = ParseResponseFileData(assembly);
+                    SyncProject(assembly, allAssetProjectParts, responseFileData);
+                }
+
+                WriteVSCodeSettingsFiles();
+            }
         }
 
         List<ResponseFileData> ParseResponseFileData(Assembly assembly)

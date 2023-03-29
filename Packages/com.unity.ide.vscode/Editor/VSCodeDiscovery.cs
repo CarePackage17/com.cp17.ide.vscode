@@ -45,7 +45,7 @@ namespace VSCodeEditor
                 GetLocalAppData() + @"/Programs/Microsoft VS Code Insiders/bin/code-insiders.cmd",
                 GetLocalAppData() + @"/Programs/Microsoft VS Code Insiders/Code.exe",
             };
-#else
+#elif UNITY_EDITOR_LINUX
             {
                 "/usr/bin/code",
                 "/bin/code",
@@ -97,6 +97,7 @@ namespace VSCodeEditor
         }
 
 #if UNITY_EDITOR_WIN
+        //Environment.GetFolderPath(SpecialFolder) might be a better fit here
         static string GetProgramFiles()
         {
             return Environment.GetEnvironmentVariable("ProgramFiles")?.Replace("\\", "/");
