@@ -656,13 +656,18 @@ namespace VSCodeEditor
             string unityPath = Path.GetDirectoryName(EditorApplication.applicationPath);
             string libraryPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library"));
 
+            var btg = BuildPipeline.GetBuildTargetGroup(EditorUserBuildSettings.activeBuildTarget);
+            var apiCompatLevel = PlayerSettings.GetApiCompatibilityLevel(btg);
+            string[] systemAssemblyDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
+
             Debug.Log($"Unity dir: {unityPath}, library dir: {libraryPath}");
+            Debug.Log($"System assembly dirs: {string.Join("\n", systemAssemblyDirs)}");
+
+            //might help: https://github.com/Unity-Technologies/UnityCsReference/blob/master/Editor/Mono/Scripting/ScriptCompilation/CompilationPipeline.cs/#L315
 
             StringBuilder asmSearchPathBuilder = new();
             asmSearchPathBuilder.AppendFormat("{0}/Data/Managed/UnityEngine/;\n", unityPath);
-            asmSearchPathBuilder.AppendFormat("{0}/Data/NetStandard/compat/2.1.0/shims/netstandard/;\n", unityPath);
-            asmSearchPathBuilder.AppendFormat("{0}/Data/NetStandard/ref/2.1.0/;\n", unityPath);
-            asmSearchPathBuilder.AppendFormat("{0}/Data/NetStandard/compat/2.1.0/shims/netfx/;\n", unityPath);
+            asmSearchPathBuilder.AppendJoin("/;\n", systemAssemblyDirs).Append("/;");
             asmSearchPathBuilder.AppendFormat("{0}/ScriptAssemblies/;\n", libraryPath);
 
             //This needs to be done extra for loose assemblies (i.e. managed plugins)

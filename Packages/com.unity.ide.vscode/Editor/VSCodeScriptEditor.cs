@@ -5,6 +5,7 @@ using System.Diagnostics;
 using UnityEditor;
 using UnityEngine;
 using Unity.CodeEditor;
+using System.Collections.Generic;
 
 namespace VSCodeEditor
 {
@@ -15,6 +16,7 @@ namespace VSCodeEditor
         const string vscode_extension = "vscode_userExtensions";
         static readonly GUIContent k_ResetArguments = EditorGUIUtility.TrTextContent("Reset argument");
         string m_Arguments;
+        List<string> m_affectedFiles = new List<string>(128);
 
         IDiscovery m_Discoverability;
         IGenerator m_ProjectGeneration;
@@ -158,7 +160,13 @@ namespace VSCodeEditor
         public void SyncIfNeeded(string[] addedFiles, string[] deletedFiles, string[] movedFiles, string[] movedFromFiles, string[] importedFiles)
         {
             (m_ProjectGeneration.AssemblyNameProvider as IPackageInfoCache)?.ResetPackageInfoCache();
-            m_ProjectGeneration.SyncIfNeeded(addedFiles.Union(deletedFiles).Union(movedFiles).Union(movedFromFiles).ToList(), importedFiles);
+            
+            m_affectedFiles.Clear();
+            m_affectedFiles.AddRange(addedFiles);
+            m_affectedFiles.AddRange(deletedFiles);
+            m_affectedFiles.AddRange(movedFiles);
+            m_affectedFiles.AddRange(movedFromFiles);
+            m_ProjectGeneration.SyncIfNeeded(m_affectedFiles, importedFiles);
         }
 
         public void SyncAll()
