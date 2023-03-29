@@ -1,5 +1,9 @@
 # Code Editor Package for Visual Studio Code
 
+## [2.0.0] - Unreleased
+
+Move to generating SDK-style projects
+
 ## [1.2.3] - 2020-10-23
 
 Remove workaround for VSCode omnisharp (as of https://github.com/OmniSharp/omnisharp-vscode/issues/4113 we no longer need to disable the referenceoutputassemblies).
