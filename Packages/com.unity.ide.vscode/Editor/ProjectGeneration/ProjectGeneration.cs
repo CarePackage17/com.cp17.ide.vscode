@@ -128,9 +128,7 @@ namespace VSCodeEditor
                 | ProjectGenerationFlag.Embedded
                 | ProjectGenerationFlag.Git
                 | ProjectGenerationFlag.Local
-#if UNITY_2019_3_OR_NEWER
                 | ProjectGenerationFlag.LocalTarBall
-#endif
                 | ProjectGenerationFlag.PlayerAssemblies
                 | ProjectGenerationFlag.Registry
                 | ProjectGenerationFlag.Unknown);
@@ -557,20 +555,12 @@ namespace VSCodeEditor
             var langVersion = langVersionList.FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(langVersion))
                 return langVersion;
-#if UNITY_2020_2_OR_NEWER
             return assembly.compilerOptions.LanguageVersion;
-#else
-            return k_TargetLanguageVersion;
-#endif
         }
 
         private static string GenerateRoslynAnalyzerRulesetPath(Assembly assembly, ILookup<string, string> otherResponseFilesData)
         {
-#if UNITY_2020_2_OR_NEWER
             return GenerateAnalyserRuleSet(otherResponseFilesData["ruleset"].Append(assembly.compilerOptions.RoslynAnalyzerRulesetPath).Where(a => !string.IsNullOrEmpty(a)).Distinct().Select(x => MakeAbsolutePath(x).NormalizePath()).ToArray());
-#else
-            return GenerateAnalyserRuleSet(otherResponseFilesData["ruleset"].Distinct().Select(x => MakeAbsolutePath(x).NormalizePath()).ToArray());
-#endif
         }
 
         private static string GenerateAnalyserRuleSet(string[] paths)
@@ -612,7 +602,6 @@ namespace VSCodeEditor
 
         string[] RetrieveRoslynAnalyzers(Assembly assembly, ILookup<string, string> otherArguments)
         {
-#if UNITY_2020_2_OR_NEWER
             return otherArguments["analyzer"].Concat(otherArguments["a"])
                 .SelectMany(x=>x.Split(';'))
 #if !ROSLYN_ANALYZER_FIX
@@ -623,13 +612,6 @@ namespace VSCodeEditor
                 .Select(MakeAbsolutePath)
                 .Distinct()
                 .ToArray();
-#else
-      return otherArguments["analyzer"].Concat(otherArguments["a"])
-        .SelectMany(x=>x.Split(';'))
-        .Distinct()
-        .Select(MakeAbsolutePath)
-        .ToArray();
-#endif
         }
         
         static string GenerateAnalyserItemGroup(string[] paths)

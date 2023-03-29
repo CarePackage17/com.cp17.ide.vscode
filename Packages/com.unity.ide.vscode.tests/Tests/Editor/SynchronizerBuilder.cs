@@ -148,7 +148,6 @@ namespace VSCodeEditor.Tests
             return this;
         }
 
-#if UNITY_2020_2_OR_NEWER
         public SynchronizerBuilder WithRoslynAnalyzerRulesetPath(string roslynAnalyzerRuleSetPath)
         {
             foreach (var assembly in m_Assemblies)
@@ -170,6 +169,5 @@ namespace VSCodeEditor.Tests
 #endif
             return this;
         }
-#endif
     }
 }
