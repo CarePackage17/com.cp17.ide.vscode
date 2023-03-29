@@ -172,7 +172,7 @@ namespace VSCodeEditor
             }
 
             var assemblies = m_AssemblyNameProvider.GetAssemblies(ShouldFileBePartOfSolution);
-            var allProjectAssemblies = RelevantAssembliesForMode(assemblies).ToList();
+            var allProjectAssemblies = assemblies.ToList();
             SyncSolution(allProjectAssemblies);
 
             var allAssetProjectParts = GenerateAllAssetProjectParts();
@@ -309,23 +309,6 @@ namespace VSCodeEditor
             return false;
         }
 
-        static ScriptingLanguage ScriptingLanguageFor(Assembly assembly)
-        {
-            return ScriptingLanguageFor(GetExtensionOfSourceFiles(assembly.sourceFiles));
-        }
-
-        static string GetExtensionOfSourceFiles(string[] files)
-        {
-            return files.Length > 0 ? GetExtensionOfSourceFile(files[0]) : "NA";
-        }
-
-        static string GetExtensionOfSourceFile(string file)
-        {
-            var ext = Path.GetExtension(file).ToLower();
-            ext = ext.Substring(1); //strip dot
-            return ext;
-        }
-
         static ScriptingLanguage ScriptingLanguageFor(string extension)
         {
             return k_BuiltinSupportedExtensions.TryGetValue(extension.TrimStart('.'), out var result)
@@ -344,7 +327,7 @@ namespace VSCodeEditor
                 var allAssetProjectParts = GenerateAllAssetProjectParts();
 
                 SyncSolution(assemblies);
-                var allProjectAssemblies = RelevantAssembliesForMode(assemblies).ToList();
+                var allProjectAssemblies = assemblies.ToList();
                 foreach (Assembly assembly in allProjectAssemblies)
                 {
                     var responseFileData = ParseResponseFileData(assembly);
@@ -814,15 +797,10 @@ namespace VSCodeEditor
             var fileversion = "11.00";
             var vsversion = "2010";
 
-            var relevantAssemblies = RelevantAssembliesForMode(assemblies);
+            var relevantAssemblies = assemblies;
             string projectEntries = GetProjectEntries(relevantAssemblies);
             string projectConfigurations = string.Join(k_WindowsNewline, relevantAssemblies.Select(i => GetProjectActiveConfigurations(ProjectGuid(i.name))).ToArray());
             return string.Format(GetSolutionText(), fileversion, vsversion, projectEntries, projectConfigurations);
-        }
-
-        static IEnumerable<Assembly> RelevantAssembliesForMode(IEnumerable<Assembly> assemblies)
-        {
-            return assemblies.Where(i => ScriptingLanguage.CSharp == ScriptingLanguageFor(i));
         }
 
         /// <summary>
