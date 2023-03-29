@@ -31,6 +31,11 @@ namespace VSCodeEditor
         public void WriteAllText(string fileName, string content)
         {
             File.WriteAllText(fileName, content, Encoding.UTF8);
+            // using (var fs = new FileStream(fileName, FileMode.Truncate, FileAccess.Write))
+            // {
+            //     //We'd need a ReadOnlySpan<byte> here but string gives us ReadOnlySpan<char>
+            //     fs.Write(content);
+            // }
         }
 
         public void CreateDirectory(string pathName)

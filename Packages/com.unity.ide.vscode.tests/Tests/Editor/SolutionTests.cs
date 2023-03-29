@@ -235,7 +235,6 @@ namespace VSCodeEditor.Tests
                 var solutionGUID = "SolutionGUID";
                 var projectGUID = "ProjectGUID";
                 var synchronizer = m_Builder
-                    .WithSolutionGuid(solutionGUID)
                     .WithProjectGuid(projectGUID, m_Builder.Assembly)
                     .Build();
 
@@ -314,9 +313,7 @@ namespace VSCodeEditor.Tests
             {
                 m_isRunningThisTest = true;
 
-                var synchronizer = m_Builder
-                    .WithSolutionGuid(solutionGUID)
-                    .Build();
+                var synchronizer = m_Builder.Build();
 
                 synchronizer.Sync();
 

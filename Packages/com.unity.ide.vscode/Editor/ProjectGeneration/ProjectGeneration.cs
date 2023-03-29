@@ -40,7 +40,6 @@ namespace VSCodeEditor
         ""**/.DS_Store"":true,
         ""**/.git"":true,
         ""**/.gitmodules"":true,
-        ""**/*.booproj"":true,
         ""**/*.pidb"":true,
         ""**/*.suo"":true,
         ""**/*.user"":true,
@@ -107,7 +106,7 @@ namespace VSCodeEditor
             { "raytrace", ScriptingLanguage.None }
         };
 
-        readonly string m_SolutionProjectEntryTemplate = string.Join("\r\n", @"Project(""{{{0}}}"") = ""{1}"", ""{2}"", ""{{{3}}}""", @"EndProject").Replace("    ", "\t");
+        readonly string m_SolutionProjectEntryTemplate = string.Join("\r\n", "Project(\"{{{0}}}\") = \"{1}\", \"{2}\", \"{{{3}}}\"", "EndProject");
 
         readonly string m_SolutionProjectConfigurationTemplate = string.Join("\r\n", @"        {{{0}}}.Debug|Any CPU.ActiveCfg = Debug|Any CPU", @"        {{{0}}}.Debug|Any CPU.Build.0 = Debug|Any CPU").Replace("    ", "\t");
 
@@ -819,7 +818,7 @@ namespace VSCodeEditor
         {
             var projectEntries = assemblies.Select(i => string.Format(
                 m_SolutionProjectEntryTemplate,
-                SolutionGuid(i),
+                m_GUIDProvider.SolutionGuid,
                 i.name,
                 Path.GetFileName(ProjectFile(i)),
                 ProjectGuid(i.name)
@@ -841,11 +840,6 @@ namespace VSCodeEditor
         string ProjectGuid(string assembly)
         {
             return m_GUIDProvider.ProjectGuid(m_ProjectName, assembly);
-        }
-
-        string SolutionGuid(Assembly assembly)
-        {
-            return m_GUIDProvider.SolutionGuid(m_ProjectName, GetExtensionOfSourceFiles(assembly.sourceFiles));
         }
 
         static string ProjectFooter()
@@ -879,11 +873,6 @@ namespace VSCodeEditor
         public static string GuidForProject(string projectName)
         {
             return ComputeGuidHashFor(projectName + "salt");
-        }
-
-        public static string GuidForSolution(string projectName, string sourceFileExtension)
-        {
-            return "FAE04EC0-301F-11D3-BF4B-00C04F79EFBC";
         }
 
         static string ComputeGuidHashFor(string input)

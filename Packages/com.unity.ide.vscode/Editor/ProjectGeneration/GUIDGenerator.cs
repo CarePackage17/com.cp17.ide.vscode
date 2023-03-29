@@ -3,7 +3,7 @@ namespace VSCodeEditor
     public interface IGUIDGenerator
     {
         string ProjectGuid(string projectName, string assemblyName);
-        string SolutionGuid(string projectName, string extension);
+        string SolutionGuid { get; }
     }
 
     class GUIDProvider : IGUIDGenerator
@@ -13,9 +13,6 @@ namespace VSCodeEditor
             return SolutionGuidGenerator.GuidForProject(projectName + assemblyName);
         }
 
-        public string SolutionGuid(string projectName, string extension)
-        {
-            return SolutionGuidGenerator.GuidForSolution(projectName, extension); // GetExtensionOfSourceFiles(assembly.sourceFiles)
-        }
+        public string SolutionGuid => "FAE04EC0-301F-11D3-BF4B-00C04F79EFBC";
     }
 }
