@@ -32,8 +32,6 @@ namespace VSCodeEditor
             CSharp
         }
 
-        public static readonly string MSBuildNamespaceUri = "http://schemas.microsoft.com/developer/msbuild/2003";
-
         const string k_WindowsNewline = "\r\n";
 
         const string k_SettingsJson = @"{
@@ -116,7 +114,6 @@ namespace VSCodeEditor
         static readonly string[] k_ReimportSyncExtensions = { ".dll", ".asmdef" };
 
         string[] m_ProjectSupportedExtensions = Array.Empty<string>();
-        const string k_TargetLanguageVersion = "latest";
 
         public string ProjectDirectory { get; }
         IAssemblyNameProvider IGenerator.AssemblyNameProvider => m_AssemblyNameProvider;
@@ -139,10 +136,6 @@ namespace VSCodeEditor
         readonly IFileIO m_FileIOProvider;
         readonly IGUIDGenerator m_GUIDProvider;
 
-        const string k_ToolsVersion = "4.0";
-        const string k_ProductVersion = "10.0.20506";
-        const string k_BaseDirectory = ".";
-        const string k_TargetFrameworkVersion = "v4.7.1";
         public ProjectGeneration(string tempDirectory)
             : this(tempDirectory, new AssemblyNameProvider(), new FileIOProvider(), new GUIDProvider()) { }
 
@@ -210,7 +203,7 @@ namespace VSCodeEditor
             return k_ReimportSyncExtensions.Contains(new FileInfo(asset).Extension);
         }
 
-        private static IEnumerable<SR.MethodInfo> GetPostProcessorCallbacks(string name)
+        static IEnumerable<SR.MethodInfo> GetPostProcessorCallbacks(string name)
         {
             return TypeCache
                 .GetTypesDerivedFrom<AssetPostprocessor>()
@@ -226,7 +219,7 @@ namespace VSCodeEditor
             }
         }
 
-        private static string InvokeAssetPostProcessorGenerationCallbacks(string name, string path, string content)
+        static string InvokeAssetPostProcessorGenerationCallbacks(string name, string path, string content)
         {
             foreach (var method in GetPostProcessorCallbacks(name))
             {
@@ -242,12 +235,12 @@ namespace VSCodeEditor
             return content;
         }
 
-        private static string OnGeneratedCSProject(string path, string content)
+        static string OnGeneratedCSProject(string path, string content)
         {
             return InvokeAssetPostProcessorGenerationCallbacks(nameof(OnGeneratedCSProject), path, content);
         }
 
-        private static string OnGeneratedSlnSolution(string path, string content)
+        static string OnGeneratedSlnSolution(string path, string content)
         {
             return InvokeAssetPostProcessorGenerationCallbacks(nameof(OnGeneratedSlnSolution), path, content);
         }
@@ -529,7 +522,7 @@ namespace VSCodeEditor
             return Path.Combine(ProjectDirectory, $"{m_ProjectName}.sln");
         }
 
-        private void ProjectHeader(
+        void ProjectHeader(
             Assembly assembly,
             List<ResponseFileData> responseFilesData,
             StringBuilder builder
@@ -548,7 +541,7 @@ namespace VSCodeEditor
             );
         }
 
-        private static string GenerateLangVersion(IEnumerable<string> langVersionList, Assembly assembly)
+        static string GenerateLangVersion(IEnumerable<string> langVersionList, Assembly assembly)
         {
             var langVersion = langVersionList.FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(langVersion))
@@ -556,24 +549,24 @@ namespace VSCodeEditor
             return assembly.compilerOptions.LanguageVersion;
         }
 
-        private static string GenerateRoslynAnalyzerRulesetPath(Assembly assembly, ILookup<string, string> otherResponseFilesData)
+        static string GenerateRoslynAnalyzerRulesetPath(Assembly assembly, ILookup<string, string> otherResponseFilesData)
         {
             return GenerateAnalyserRuleSet(otherResponseFilesData["ruleset"].Append(assembly.compilerOptions.RoslynAnalyzerRulesetPath).Where(a => !string.IsNullOrEmpty(a)).Distinct().Select(x => MakeAbsolutePath(x).NormalizePath()).ToArray());
         }
 
-        private static string GenerateAnalyserRuleSet(string[] paths)
+        static string GenerateAnalyserRuleSet(string[] paths)
         {
             return paths.Length == 0
                 ? string.Empty
                 : $"{Environment.NewLine}{string.Join(Environment.NewLine, paths.Select(a => $"    <CodeAnalysisRuleSet>{a}</CodeAnalysisRuleSet>"))}";
         }
 
-        private static string MakeAbsolutePath(string path)
+        static string MakeAbsolutePath(string path)
         {
             return Path.IsPathRooted(path) ? path : Path.GetFullPath(path);
         }
 
-        private static ILookup<string, string> GetOtherArgumentsFromResponseFilesData(List<ResponseFileData> responseFilesData)
+        static ILookup<string, string> GetOtherArgumentsFromResponseFilesData(List<ResponseFileData> responseFilesData)
         {
             var paths = responseFilesData.SelectMany(x =>
                 {
@@ -693,46 +686,6 @@ namespace VSCodeEditor
                 allowUnsafe,
                 asmSearchPathBuilder.ToString()
             ).Append(k_WindowsNewline);
-            // builder.Append(@"<?xml version=""1.0"" encoding=""utf-8""?>").Append(k_WindowsNewline);
-            // builder.Append(@"<Project ToolsVersion=""").Append(k_ToolsVersion).Append(@""" DefaultTargets=""Build"" xmlns=""").Append(MSBuildNamespaceUri).Append(@""">").Append(k_WindowsNewline);
-            // builder.Append(@"  <PropertyGroup>").Append(k_WindowsNewline);
-            // builder.Append(@"    <LangVersion>").Append(langVersion).Append("</LangVersion>").Append(k_WindowsNewline);
-            // builder.Append(@"  </PropertyGroup>").Append(k_WindowsNewline);
-            // builder.Append(@"  <PropertyGroup>").Append(k_WindowsNewline);
-            // builder.Append(@"    <Configuration Condition="" '$(Configuration)' == '' "">Debug</Configuration>").Append(k_WindowsNewline);
-            // builder.Append(@"    <Platform Condition="" '$(Platform)' == '' "">AnyCPU</Platform>").Append(k_WindowsNewline);
-            // builder.Append(@"    <ProductVersion>").Append(k_ProductVersion).Append("</ProductVersion>").Append(k_WindowsNewline);
-            // builder.Append(@"    <SchemaVersion>2.0</SchemaVersion>").Append(k_WindowsNewline);
-            // builder.Append(@"    <RootNamespace>").Append(EditorSettings.projectGenerationRootNamespace).Append("</RootNamespace>").Append(k_WindowsNewline);
-            // builder.Append(@"    <ProjectGuid>{").Append(assemblyGUID).Append("}</ProjectGuid>").Append(k_WindowsNewline);
-            // builder.Append(@"    <OutputType>Library</OutputType>").Append(k_WindowsNewline);
-            // builder.Append(@"    <AppDesignerFolder>Properties</AppDesignerFolder>").Append(k_WindowsNewline);
-            // builder.Append(@"    <AssemblyName>").Append(assemblyName).Append("</AssemblyName>").Append(k_WindowsNewline);
-            // builder.Append(@"    <TargetFrameworkVersion>").Append(k_TargetFrameworkVersion).Append("</TargetFrameworkVersion>").Append(k_WindowsNewline);
-            // builder.Append(@"    <FileAlignment>512</FileAlignment>").Append(k_WindowsNewline);
-            // builder.Append(@"    <BaseDirectory>").Append(k_BaseDirectory).Append("</BaseDirectory>").Append(k_WindowsNewline);
-            // builder.Append(@"  </PropertyGroup>").Append(k_WindowsNewline);
-            // builder.Append(@"  <PropertyGroup Condition="" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' "">").Append(k_WindowsNewline);
-            // builder.Append(@"    <DebugSymbols>true</DebugSymbols>").Append(k_WindowsNewline);
-            // builder.Append(@"    <DebugType>full</DebugType>").Append(k_WindowsNewline);
-            // builder.Append(@"    <Optimize>false</Optimize>").Append(k_WindowsNewline);
-            // builder.Append(@"    <OutputPath>Temp\bin\Debug\</OutputPath>").Append(k_WindowsNewline);
-            // builder.Append(@"    <DefineConstants>").Append(defines).Append("</DefineConstants>").Append(k_WindowsNewline);
-            // builder.Append(@"    <ErrorReport>prompt</ErrorReport>").Append(k_WindowsNewline);
-            // builder.Append(@"    <WarningLevel>4</WarningLevel>").Append(k_WindowsNewline);
-            // builder.Append(@"    <NoWarn>0169</NoWarn>").Append(k_WindowsNewline);
-            // builder.Append(@"    <AllowUnsafeBlocks>").Append(allowUnsafe).Append("</AllowUnsafeBlocks>").Append(k_WindowsNewline);
-            // builder.Append(@"  </PropertyGroup>").Append(k_WindowsNewline);
-            // builder.Append(@"  <PropertyGroup>").Append(k_WindowsNewline);
-            // builder.Append(@"    <NoConfig>true</NoConfig>").Append(k_WindowsNewline);
-            // builder.Append(@"    <NoStdLib>true</NoStdLib>").Append(k_WindowsNewline);
-            // builder.Append(@"    <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences>").Append(k_WindowsNewline);
-            // builder.Append(@"    <ImplicitlyExpandNETStandardFacades>false</ImplicitlyExpandNETStandardFacades>").Append(k_WindowsNewline);
-            // builder.Append(@"    <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>").Append(k_WindowsNewline);
-            // builder.Append(rulesetBlock);
-            // builder.Append(@"  </PropertyGroup>").Append(k_WindowsNewline);
-            // builder.Append(analyzerBlock);
-            // builder.Append(@"  <ItemGroup>").Append(k_WindowsNewline);
         }
 
         void SyncSolution(IEnumerable<Assembly> assemblies)
