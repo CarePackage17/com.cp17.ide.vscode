@@ -398,7 +398,7 @@ namespace VSCodeEditor
                         stringBuilders[assemblyName] = projectBuilder;
                     }
 
-                    projectBuilder.Append("     <None Include=\"").Append(m_FileIOProvider.EscapedRelativePathFor(asset, ProjectDirectory)).Append("\" />").Append(k_WindowsNewline);
+                    projectBuilder.Append("    <None Include=\"").Append(m_FileIOProvider.EscapedRelativePathFor(asset, ProjectDirectory)).Append("\" />").Append(k_WindowsNewline);
                 }
             }
 
@@ -470,7 +470,7 @@ namespace VSCodeEditor
             foreach (string file in assembly.sourceFiles)
             {
                 var fullFile = m_FileIOProvider.EscapedRelativePathFor(file, ProjectDirectory);
-                m_projectFileBuilder.Append("     <Compile Include=\"").Append(fullFile).Append("\" />").Append(k_WindowsNewline);
+                m_projectFileBuilder.Append("    <Compile Include=\"").Append(fullFile).Append("\" />").Append(k_WindowsNewline);
             }
 
             // Append additional non-script files that should be included in project generation.
