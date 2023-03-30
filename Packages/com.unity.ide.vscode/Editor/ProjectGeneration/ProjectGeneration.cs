@@ -590,6 +590,7 @@ namespace VSCodeEditor
 
         static void AppendReference(string fullReference, StringBuilder projectBuilder)
         {
+            //https://github.com/Unity-Technologies/mono/blob/unity-2021.3-mbe/mcs/class/corlib/System.Security/SecurityElement.cs#L294
             var escapedFullPath = SecurityElement.Escape(fullReference);
 
             //I wonder if this is needed now that msbuild is cross-plat...
@@ -616,6 +617,10 @@ namespace VSCodeEditor
             return Path.Combine(ProjectDirectory, $"{m_ProjectName}.sln");
         }
 
+        //I wonder if it's faster to use hashset vs fucking around with arrays + maybe
+        //a fast hash that unity has built in?
+        HashSet<string> m_defines = new();
+
         void ProjectHeader(
             Assembly assembly,
             List<ResponseFileData> responseFilesData,
@@ -623,24 +628,41 @@ namespace VSCodeEditor
         )
         {
             var otherArguments = GetOtherArgumentsFromResponseFilesData(responseFilesData);
+
+            //This allocates a whole fucking lot. Let's see if we can do the same thing
+            //without allocating a while fucking lot
+            m_defines.Clear();
+            m_defines.Add("DEBUG");
+            m_defines.Add("TRACE");
+            m_defines.UnionWith(assembly.defines);
+            m_defines.UnionWith(EditorUserBuildSettings.activeScriptCompilationDefines);
+
+            foreach (var rspFileData in responseFilesData)
+            {
+                m_defines.UnionWith(rspFileData.Defines);
+            }
+
+            // var defines = new[] { "DEBUG", "TRACE" }
+            //         .Concat(assembly.defines)
+            //         .Concat(responseFilesData.SelectMany(x => x.Defines))
+            //         //do we really need this?
+            //         //I mean the compiler should append everything needed for editor and player assemblies
+            //         //and CompilationPipeline should tell us, right?
+            //         // .Concat(EditorUserBuildSettings.activeScriptCompilationDefines)
+            //         .Distinct()
+            //         .ToArray();
+            var defines = m_defines;
+
             GetProjectHeaderTemplate(
                 builder,
                 ProjectGuid(assembly.name),
                 assembly.name,
-                string.Join(";", new[] { "DEBUG", "TRACE" }.Concat(assembly.defines).Concat(responseFilesData.SelectMany(x => x.Defines)).Concat(EditorUserBuildSettings.activeScriptCompilationDefines).Distinct().ToArray()),
-                GenerateLangVersion(otherArguments["langversion"], assembly),
+                string.Join(";", defines),
+                assembly.compilerOptions.LanguageVersion,
                 assembly.compilerOptions.AllowUnsafeCode | responseFilesData.Any(x => x.Unsafe),
                 GenerateAnalyserItemGroup(RetrieveRoslynAnalyzers(assembly, otherArguments)),
                 GenerateRoslynAnalyzerRulesetPath(assembly, otherArguments)
             );
-        }
-
-        static string GenerateLangVersion(IEnumerable<string> langVersionList, Assembly assembly)
-        {
-            var langVersion = langVersionList.FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(langVersion))
-                return langVersion;
-            return assembly.compilerOptions.LanguageVersion;
         }
 
         static string GenerateRoslynAnalyzerRulesetPath(Assembly assembly, ILookup<string, string> otherResponseFilesData)
