@@ -272,6 +272,7 @@ namespace VSCodeEditor
         void SetupProjectSupportedExtensions()
         {
             m_ProjectSupportedExtensions = m_AssemblyNameProvider.ProjectSupportedExtensions;
+            Debug.Log($"Project supported extensions: {string.Join('\n', m_ProjectSupportedExtensions)}");
         }
 
         bool ShouldFileBePartOfSolution(string file)
@@ -330,6 +331,16 @@ namespace VSCodeEditor
                 var allProjectAssemblies = assemblies.ToList();
                 foreach (Assembly assembly in allProjectAssemblies)
                 {
+                    StringBuilder debugInfo = new();
+                    var api = assembly.compilerOptions.ApiCompatibilityLevel;
+                    var lang = assembly.compilerOptions.LanguageVersion;
+                    debugInfo.AppendLine($"{assembly.name}:\nrootNamespace: {assembly.rootNamespace}");
+                    debugInfo.AppendLine($"ApiCompatibilityLevel: {api}, languageVersion: {lang}");
+                    debugInfo.AppendLine($"defines: {string.Join(';', assembly.defines)}");
+                    debugInfo.AppendLine($"sourceFiles: {string.Join(' ', assembly.sourceFiles)}" );
+                    debugInfo.AppendLine($"allReferences: {string.Join(' ', assembly.allReferences)}" );
+                    Debug.Log(debugInfo.ToString());
+
                     var responseFileData = ParseResponseFileData(assembly);
                     SyncProject(assembly, allAssetProjectParts, responseFileData);
                 }
@@ -661,7 +672,8 @@ namespace VSCodeEditor
                 assembly.compilerOptions.LanguageVersion,
                 assembly.compilerOptions.AllowUnsafeCode | responseFilesData.Any(x => x.Unsafe),
                 GenerateAnalyserItemGroup(RetrieveRoslynAnalyzers(assembly, otherArguments)),
-                GenerateRoslynAnalyzerRulesetPath(assembly, otherArguments)
+                GenerateRoslynAnalyzerRulesetPath(assembly, otherArguments),
+                CompilationPipeline.GetSystemAssemblyDirectories(assembly.compilerOptions.ApiCompatibilityLevel)
             );
         }
 
@@ -761,7 +773,8 @@ namespace VSCodeEditor
             string langVersion,
             bool allowUnsafe,
             string analyzerBlock,
-            string rulesetBlock
+            string rulesetBlock,
+            string[] systemAssemblyDirs = null
         )
         {
             string unityPath = Path.GetDirectoryName(EditorApplication.applicationPath);
@@ -769,7 +782,7 @@ namespace VSCodeEditor
 
             var btg = BuildPipeline.GetBuildTargetGroup(EditorUserBuildSettings.activeBuildTarget);
             var apiCompatLevel = PlayerSettings.GetApiCompatibilityLevel(btg);
-            string[] systemAssemblyDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
+            // string[] systemAssemblyDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
 
             // Debug.Log($"Unity dir: {unityPath}, library dir: {libraryPath}");
             // Debug.Log($"System assembly dirs: {string.Join("\n", systemAssemblyDirs)}");
