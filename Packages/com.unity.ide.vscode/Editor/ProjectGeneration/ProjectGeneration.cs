@@ -11,6 +11,8 @@ using UnityEditor.Compilation;
 using UnityEngine;
 using UnityEngine.Profiling;
 using Unity.Profiling;
+using Unity.Jobs;
+using Unity.Collections;
 
 namespace VSCodeEditor
 {
@@ -261,6 +263,17 @@ namespace VSCodeEditor
                 GenerateAndWriteSolutionAndProjects();
 
                 OnGeneratedCSProjectFiles();
+
+                NativeText outputDefines = new(1024, Allocator.TempJob);
+                GenerateProjectJob job = new()
+                {
+                    definesFormat = new Unity.Collections.NativeText("<DefineConstants>{0}</DefineConstants>", Unity.Collections.Allocator.TempJob),
+                    defines = new("DEBUG;TRACE", Unity.Collections.Allocator.TempJob),
+                    output = outputDefines
+                };
+                JobHandle h = job.Schedule();
+                h.Complete();
+                Debug.Log(outputDefines.ToString());
             }
         }
 
@@ -502,7 +515,7 @@ namespace VSCodeEditor
             {
                 //TODO: check if nullable is defined. we wanna write it into the project, otherwise
                 //omnisharp won't pick it up if it's in the rsp file only.
-                
+
                 rspItem = string.Concat("<CompilerResponseFile>", assembly.compilerOptions.ResponseFiles[0], "</CompilerResponseFile>");
                 if (rspFilePaths.Length > 1) Debug.LogWarning("Multiple rsp files affecting compilation");
             }

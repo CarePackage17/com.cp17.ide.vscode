@@ -1,11 +1,18 @@
 {
     "name": "Unity.VSCode.Editor",
-    "references": [],
-    "optionalUnityReferences": [],
+    "rootNamespace": "",
+    "references": [
+        "GUID:e0cd26848372d4e5c891c569017e11f1"
+    ],
     "includePlatforms": [
         "Editor"
     ],
     "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
     "versionDefines": [
         {
             "name": "Unity",
@@ -22,5 +29,6 @@
             "expression": "[2020.3.6f1,2021.0]",
             "define": "ROSLYN_ANALYZER_FIX"
         }
-    ]
+    ],
+    "noEngineReferences": false
 }

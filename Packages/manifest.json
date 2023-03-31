@@ -1,6 +1,7 @@
 {
   "disableProjectUpdate": true,
   "dependencies": {
+    "com.unity.collections": "1.2.4",
     "com.unity.test-framework": "1.1.33"
   }
 }
