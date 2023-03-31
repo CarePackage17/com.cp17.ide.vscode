@@ -264,16 +264,44 @@ namespace VSCodeEditor
 
                 OnGeneratedCSProjectFiles();
 
-                NativeText outputDefines = new(1024, Allocator.TempJob);
+                NativeText output = new(1024, Allocator.TempJob);
+                NativeText headerTemplate = new(@"<Project Sdk=""Microsoft.NET.Sdk"">
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <LangVersion>{0}</LangVersion>
+        <EnableDefaultItems>false</EnableDefaultItems>
+        <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <Deterministic>true</Deterministic>
+        <OutputPath>Temp</OutputPath>
+        <DefineConstants>{1}</DefineConstants>
+        <AllowUnsafeBlocks>{2}</AllowUnsafeBlocks>
+        <AssemblySearchPaths>
+            {3};
+            $(AssemblySearchPaths)
+        </AssemblySearchPaths>
+        </PropertyGroup>
+    <ItemGroup>", Allocator.TempJob);
+                NativeText defines = new("DEBUG;TRACE", Allocator.TempJob);
+                NativeText asmSearchPaths = new("Yo/this/is/a/path;This/is another one/;/thisispatrick", Allocator.TempJob);
+
                 GenerateProjectJob job = new()
                 {
-                    definesFormat = new Unity.Collections.NativeText("<DefineConstants>{0}</DefineConstants>", Unity.Collections.Allocator.TempJob),
-                    defines = new("DEBUG;TRACE", Unity.Collections.Allocator.TempJob),
-                    output = outputDefines
+                    template = headerTemplate,
+                    defines = defines,
+                    unsafeCode = false,
+                    langVersion = "9.0",
+                    asmSearchPath = asmSearchPaths,
+                    output = output
                 };
                 JobHandle h = job.Schedule();
                 h.Complete();
-                Debug.Log(outputDefines.ToString());
+                Debug.Log(output.ToString());
+                
+                output.Dispose();
+                headerTemplate.Dispose();
+                defines.Dispose();
+                asmSearchPaths.Dispose();
             }
         }
 

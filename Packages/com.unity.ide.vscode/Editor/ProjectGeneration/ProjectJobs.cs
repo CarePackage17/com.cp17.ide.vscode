@@ -5,14 +5,15 @@ struct GenerateProjectJob : IJob
 {
     //we need some data here, probably using the collections package
     //and nativetext.
-    // public NativeText template;
-    // public FixedString32Bytes langVersion;
-    // public NativeText defines;
-    // public bool unsafeCode;
-    // public NativeText asmSearchPath;
-
     [ReadOnly]
-    public NativeText definesFormat;
+    public NativeText template;
+    [ReadOnly]
+    public FixedString32Bytes langVersion;
+    [ReadOnly]
+    public bool unsafeCode;
+    [ReadOnly]
+    public NativeText asmSearchPath;
+
     [ReadOnly]
     public NativeText defines;
 
@@ -20,6 +21,7 @@ struct GenerateProjectJob : IJob
 
     public void Execute()
     {
-        output.AppendFormat(in definesFormat, defines);
+        FixedString32Bytes allowUnsafe = new(unsafeCode.ToString());
+        output.AppendFormat(in template, langVersion, defines, allowUnsafe, asmSearchPath);
     }
 }
