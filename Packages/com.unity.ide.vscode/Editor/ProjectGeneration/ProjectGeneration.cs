@@ -476,6 +476,8 @@ namespace VSCodeEditor
         string ProjectText2(Assembly assembly, Dictionary<string, string> allAssetsProjectParts, List<ResponseFileData> responseFilesData)
         {
             m_projectFileBuilder.Clear();
+            m_asmSearchPaths.Clear();
+            m_defines.Clear();
 
             //so what's the data we got?
             //assembly got lots of data, like:
@@ -486,7 +488,61 @@ namespace VSCodeEditor
             //- response file data (can add defines, references, unsafe and other compiler options)
             //  - we can use <CompilerResponseFile> item in project file, no need to parse a thing
 
-            ProjectHeader(assembly, responseFilesData, m_projectFileBuilder);
+            string langVersion = assembly.compilerOptions.LanguageVersion;
+            ApiCompatibilityLevel dotnetApiVersion = assembly.compilerOptions.ApiCompatibilityLevel;
+            //if this is true in asmdef but there's a response file saying no, which
+            //takes precedence?
+            bool allowUnsafe = assembly.compilerOptions.AllowUnsafeCode;
+
+            //Is it possible to have multiple rsp files affecting a compilation?
+            //maybe we do need custom parsing after all...
+            string[] rspFilePaths = assembly.compilerOptions.ResponseFiles;
+            string rspItem = string.Empty;
+            if (rspFilePaths.Length > 0)
+            {
+                //TODO: check if nullable is defined. we wanna write it into the project, otherwise
+                //omnisharp won't pick it up if it's in the rsp file only.
+                
+                rspItem = string.Concat("<CompilerResponseFile>", assembly.compilerOptions.ResponseFiles[0], "</CompilerResponseFile>");
+                if (rspFilePaths.Length > 1) Debug.LogWarning("Multiple rsp files affecting compilation");
+            }
+
+            foreach (string asmPath in assembly.allReferences)
+            {
+                string dir = Path.GetDirectoryName(asmPath);
+                m_asmSearchPaths.Add(dir);
+            }
+
+            m_defines.UnionWith(assembly.defines);
+
+            m_projectFileBuilder.AppendFormat(
+@"<Project Sdk=""Microsoft.NET.Sdk"">
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <LangVersion>{0}</LangVersion>
+        <EnableDefaultItems>false</EnableDefaultItems>
+        <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <Deterministic>true</Deterministic>
+        <OutputPath>Temp</OutputPath>
+        <DefineConstants>{1}</DefineConstants>
+        <AllowUnsafeBlocks>{2}</AllowUnsafeBlocks>
+        <AssemblySearchPaths>
+            {3};
+            $(AssemblySearchPaths)
+        </AssemblySearchPaths>
+        {4}
+    </PropertyGroup>
+    <ItemGroup>",
+                langVersion,
+                string.Join(';', m_defines),
+                allowUnsafe,
+                //I wonder which of these 2 is faster
+                // asmSearchPathBuilder.ToString()
+                string.Join(";", m_asmSearchPaths),
+                rspItem
+            );
+
             var references = new List<string>();
 
             foreach (string file in assembly.sourceFiles)
@@ -789,8 +845,8 @@ namespace VSCodeEditor
             bool allowUnsafe,
             string analyzerBlock,
             string rulesetBlock,
-            string[] systemAssemblyDirs = null,
-            HashSet<string> asmSearchPaths = null
+            string[]? systemAssemblyDirs = null,
+            HashSet<string>? asmSearchPaths = null
         )
         {
             // string unityPath = Path.GetDirectoryName(EditorApplication.applicationPath);
@@ -799,9 +855,12 @@ namespace VSCodeEditor
             // Debug.Log($"System assembly dirs: {string.Join("\n", systemAssemblyDirs)}");
 
             StringBuilder asmSearchPathBuilder = new();
-            foreach (string path in asmSearchPaths)
+            if (asmSearchPaths != null)
             {
-                asmSearchPathBuilder.Append(path).Append(';');
+                foreach (string path in asmSearchPaths)
+                {
+                    asmSearchPathBuilder.Append(path).Append(';');
+                }
             }
 
             builder.AppendFormat(
@@ -827,7 +886,7 @@ namespace VSCodeEditor
                 allowUnsafe,
                 //I wonder which of these 2 is faster
                 asmSearchPathBuilder.ToString()
-                // string.Join(";", asmSearchPaths)
+            // string.Join(";", asmSearchPaths)
             ).Append(k_WindowsNewline);
         }
 

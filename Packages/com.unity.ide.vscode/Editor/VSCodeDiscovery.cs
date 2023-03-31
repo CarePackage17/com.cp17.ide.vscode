@@ -13,7 +13,7 @@ namespace VSCodeEditor
 
     public class VSCodeDiscovery : IDiscovery
     {
-        List<CodeEditor.Installation> m_Installations;
+        List<CodeEditor.Installation> m_Installations = new();
 
         public CodeEditor.Installation[] PathCallback()
         {
