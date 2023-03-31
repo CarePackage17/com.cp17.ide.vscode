@@ -337,8 +337,8 @@ namespace VSCodeEditor
                     debugInfo.AppendLine($"{assembly.name}:\nrootNamespace: {assembly.rootNamespace}");
                     debugInfo.AppendLine($"ApiCompatibilityLevel: {api}, languageVersion: {lang}");
                     debugInfo.AppendLine($"defines: {string.Join(';', assembly.defines)}");
-                    debugInfo.AppendLine($"sourceFiles: {string.Join(' ', assembly.sourceFiles)}" );
-                    debugInfo.AppendLine($"allReferences: {string.Join(' ', assembly.allReferences)}" );
+                    debugInfo.AppendLine($"sourceFiles: {string.Join(' ', assembly.sourceFiles)}");
+                    debugInfo.AppendLine($"allReferences: {string.Join(' ', assembly.allReferences)}");
                     Debug.Log(debugInfo.ToString());
 
                     var responseFileData = ParseResponseFileData(assembly);
@@ -485,14 +485,11 @@ namespace VSCodeEditor
             if (allAssetsProjectParts.TryGetValue(assembly.name, out var additionalAssetsForProject))
                 m_projectFileBuilder.Append(additionalAssetsForProject);
 
-            // var responseRefs = responseFilesData.SelectMany(x => x.FullPathReferences.Select(r => r));
-            foreach (var thing in responseFilesData)
+            foreach (var rspData in responseFilesData)
             {
-                references.AddRange(thing.FullPathReferences);
+                references.AddRange(rspData.FullPathReferences);
             }
 
-            // var internalAssemblyReferences = assembly.assemblyReferences
-            //   .Where(i => !i.sourceFiles.Any(ShouldFileBePartOfSolution)).Select(i => i.outputPath);
             foreach (var thing in assembly.assemblyReferences)
             {
                 foreach (var file in thing.sourceFiles)
@@ -518,14 +515,6 @@ namespace VSCodeEditor
             {
                 m_projectFileBuilder.Append("  </ItemGroup>").Append(k_WindowsNewline);
                 m_projectFileBuilder.Append("  <ItemGroup>").Append(k_WindowsNewline);
-
-                // foreach (Assembly reference in assembly.assemblyReferences.Where(i => i.sourceFiles.Any(ShouldFileBePartOfSolution)))
-                // {
-                //     m_projectFileBuilder.Append("    <ProjectReference Include=\"").Append(reference.name).Append(GetProjectExtension()).Append("\">").Append(k_WindowsNewline);
-                //     m_projectFileBuilder.Append("      <Project>{").Append(ProjectGuid(reference.name)).Append("}</Project>").Append(k_WindowsNewline);
-                //     m_projectFileBuilder.Append("      <Name>").Append(reference.name).Append("</Name>").Append(k_WindowsNewline);
-                //     m_projectFileBuilder.Append("    </ProjectReference>").Append(k_WindowsNewline);
-                // }
 
                 foreach (Assembly reference in assembly.assemblyReferences)
                 {
@@ -631,6 +620,7 @@ namespace VSCodeEditor
         //I wonder if it's faster to use hashset vs fucking around with arrays + maybe
         //a fast hash that unity has built in?
         HashSet<string> m_defines = new();
+        HashSet<string> m_asmSearchPaths = new();
 
         void ProjectHeader(
             Assembly assembly,
@@ -640,12 +630,14 @@ namespace VSCodeEditor
         {
             var otherArguments = GetOtherArgumentsFromResponseFilesData(responseFilesData);
 
-            //This allocates a whole fucking lot. Let's see if we can do the same thing
-            //without allocating a while fucking lot
             m_defines.Clear();
-            m_defines.Add("DEBUG");
-            m_defines.Add("TRACE");
+            // m_defines.Add("DEBUG");
+            // m_defines.Add("TRACE");
             m_defines.UnionWith(assembly.defines);
+
+            //I don't think we need to include this?
+            //CompilationPipeline should give us all the defines a dll is compiled with,
+            //otherwise what's the point?
             m_defines.UnionWith(EditorUserBuildSettings.activeScriptCompilationDefines);
 
             foreach (var rspFileData in responseFilesData)
@@ -653,6 +645,8 @@ namespace VSCodeEditor
                 m_defines.UnionWith(rspFileData.Defines);
             }
 
+            //This allocates a whole fucking lot. Let's see if we can do the same thing
+            //without allocating a while fucking lot
             // var defines = new[] { "DEBUG", "TRACE" }
             //         .Concat(assembly.defines)
             //         .Concat(responseFilesData.SelectMany(x => x.Defines))
@@ -664,6 +658,14 @@ namespace VSCodeEditor
             //         .ToArray();
             var defines = m_defines;
 
+            m_asmSearchPaths.Clear();
+            //This kinda sucks because we also iterate over all assembly references when doing AppendReference
+            foreach (string asmPath in assembly.allReferences)
+            {
+                string dir = Path.GetDirectoryName(asmPath);
+                m_asmSearchPaths.Add(dir);
+            }
+
             GetProjectHeaderTemplate(
                 builder,
                 ProjectGuid(assembly.name),
@@ -673,7 +675,8 @@ namespace VSCodeEditor
                 assembly.compilerOptions.AllowUnsafeCode | responseFilesData.Any(x => x.Unsafe),
                 GenerateAnalyserItemGroup(RetrieveRoslynAnalyzers(assembly, otherArguments)),
                 GenerateRoslynAnalyzerRulesetPath(assembly, otherArguments),
-                CompilationPipeline.GetSystemAssemblyDirectories(assembly.compilerOptions.ApiCompatibilityLevel)
+                CompilationPipeline.GetSystemAssemblyDirectories(assembly.compilerOptions.ApiCompatibilityLevel),
+                m_asmSearchPaths
             );
         }
 
@@ -774,25 +777,20 @@ namespace VSCodeEditor
             bool allowUnsafe,
             string analyzerBlock,
             string rulesetBlock,
-            string[] systemAssemblyDirs = null
+            string[] systemAssemblyDirs = null,
+            HashSet<string> asmSearchPaths = null
         )
         {
-            string unityPath = Path.GetDirectoryName(EditorApplication.applicationPath);
-            string libraryPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library"));
-
+            // string unityPath = Path.GetDirectoryName(EditorApplication.applicationPath);
+            // string libraryPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library"));
             // Debug.Log($"Unity dir: {unityPath}, library dir: {libraryPath}");
             // Debug.Log($"System assembly dirs: {string.Join("\n", systemAssemblyDirs)}");
 
-            //might help: https://github.com/Unity-Technologies/UnityCsReference/blob/master/Editor/Mono/Scripting/ScriptCompilation/CompilationPipeline.cs/#L315
-
             StringBuilder asmSearchPathBuilder = new();
-            asmSearchPathBuilder.AppendFormat("{0}/Data/Managed/UnityEngine/;\n", unityPath);
-            asmSearchPathBuilder.AppendJoin("/;\n", systemAssemblyDirs).Append("/;");
-            asmSearchPathBuilder.AppendFormat("{0}/ScriptAssemblies/;\n", libraryPath);
-
-            //This needs to be done extra for loose assemblies (i.e. managed plugins)
-            asmSearchPathBuilder.AppendFormat("{0}/PackageCache/nuget.moq@1.0.0/\n;", libraryPath);
-            asmSearchPathBuilder.AppendFormat("{0}/PackageCache/com.unity.ext.nunit@1.0.6/net35/unity-custom;", libraryPath);
+            foreach (string path in asmSearchPaths)
+            {
+                asmSearchPathBuilder.Append(path).Append(';');
+            }
 
             builder.AppendFormat(
 @"<Project Sdk=""Microsoft.NET.Sdk"">
@@ -814,7 +812,9 @@ namespace VSCodeEditor
                 langVersion,
                 defines,
                 allowUnsafe,
+                //I wonder which of these 2 is faster
                 asmSearchPathBuilder.ToString()
+                // string.Join(";", asmSearchPaths)
             ).Append(k_WindowsNewline);
         }
 
