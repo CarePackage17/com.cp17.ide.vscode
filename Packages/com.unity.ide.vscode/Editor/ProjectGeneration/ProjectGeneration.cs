@@ -264,6 +264,9 @@ namespace VSCodeEditor
 
                 OnGeneratedCSProjectFiles();
 
+                //So in theory we could get the data for every assembly, copying stuff into nativestrings
+                //and then generate everything is a parallelfor job.
+                //I wonder if that gives us any perf benefit.
                 NativeText output = new(1024, Allocator.TempJob);
                 NativeText headerTemplate = new(@"<Project Sdk=""Microsoft.NET.Sdk"">
     <PropertyGroup>
@@ -297,7 +300,7 @@ namespace VSCodeEditor
                 JobHandle h = job.Schedule();
                 h.Complete();
                 Debug.Log(output.ToString());
-                
+
                 output.Dispose();
                 headerTemplate.Dispose();
                 defines.Dispose();
