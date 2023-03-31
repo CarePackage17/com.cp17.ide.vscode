@@ -334,8 +334,12 @@ namespace VSCodeEditor
                     StringBuilder debugInfo = new();
                     var api = assembly.compilerOptions.ApiCompatibilityLevel;
                     var lang = assembly.compilerOptions.LanguageVersion;
+                    var additional = string.Join(' ', assembly.compilerOptions.AdditionalCompilerArguments);
+                    //for deterministic comp there is ScriptCompilerOptions.UseDeterministicCompilation (internal)
+                    //either fuck around with reflection or set it to true unconditionally, the assemblies dotnet build compiles
+                    //aren't used by unity editor anyway
                     debugInfo.AppendLine($"{assembly.name}:\nrootNamespace: {assembly.rootNamespace}");
-                    debugInfo.AppendLine($"ApiCompatibilityLevel: {api}, languageVersion: {lang}");
+                    debugInfo.AppendLine($"ApiCompatibilityLevel: {api}, languageVersion: {lang}, additionalArgs: {additional}");
                     debugInfo.AppendLine($"defines: {string.Join(';', assembly.defines)}");
                     debugInfo.AppendLine($"sourceFiles: {string.Join(' ', assembly.sourceFiles)}");
                     debugInfo.AppendLine($"allReferences: {string.Join(' ', assembly.allReferences)}");
@@ -424,8 +428,9 @@ namespace VSCodeEditor
             List<ResponseFileData> responseFilesData)
         {
             SyncProjectFileIfNotChanged(
-                ProjectFile(assembly),
+                // ProjectFile(assembly),
                 // ProjectText(assembly, allAssetsProjectParts, responseFilesData)
+                Path.Combine(ProjectDirectory, string.Concat(assembly.name, ".csproj")),
                 ProjectText2(assembly, allAssetsProjectParts, responseFilesData)
             );
         }
@@ -471,6 +476,15 @@ namespace VSCodeEditor
         string ProjectText2(Assembly assembly, Dictionary<string, string> allAssetsProjectParts, List<ResponseFileData> responseFilesData)
         {
             m_projectFileBuilder.Clear();
+
+            //so what's the data we got?
+            //assembly got lots of data, like:
+            //- .NET API version, C# version
+            //- defines
+            //- assembly references
+            //- source files
+            //- response file data (can add defines, references, unsafe and other compiler options)
+            //  - we can use <CompilerResponseFile> item in project file, no need to parse a thing
 
             ProjectHeader(assembly, responseFilesData, m_projectFileBuilder);
             var references = new List<string>();
@@ -631,8 +645,6 @@ namespace VSCodeEditor
             var otherArguments = GetOtherArgumentsFromResponseFilesData(responseFilesData);
 
             m_defines.Clear();
-            // m_defines.Add("DEBUG");
-            // m_defines.Add("TRACE");
             m_defines.UnionWith(assembly.defines);
 
             //I don't think we need to include this?
@@ -800,6 +812,7 @@ namespace VSCodeEditor
         <EnableDefaultItems>false</EnableDefaultItems>
         <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <Deterministic>true</Deterministic>
         <OutputPath>Temp</OutputPath>
         <DefineConstants>{1}</DefineConstants>
         <AllowUnsafeBlocks>{2}</AllowUnsafeBlocks>
