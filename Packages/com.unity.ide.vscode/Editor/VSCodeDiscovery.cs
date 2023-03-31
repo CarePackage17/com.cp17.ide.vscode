@@ -52,7 +52,9 @@ namespace VSCodeEditor
                 "/usr/local/bin/code",
                 "/var/lib/flatpak/exports/bin/com.visualstudio.code",
                 "/snap/current/bin/code",
-                "/snap/bin/code"
+                "/snap/bin/code",
+                "/usr/bin/codium",
+                "/var/lib/flatpak/exports/bin/com.vscodium.codium"
             };
 #endif
             var existingPaths = possiblePaths.Where(VSCodeExists).ToList();

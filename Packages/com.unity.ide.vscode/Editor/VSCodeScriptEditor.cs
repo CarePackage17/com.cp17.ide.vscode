@@ -31,7 +31,8 @@ namespace VSCodeEditor
             "code.cmd",
             "code-insiders.cmd",
             "code",
-            "com.visualstudio.code"
+            "com.visualstudio.code",
+            "codium"
         };
 
         const string DefaultArgument = "\"$(ProjectPath)\" -g \"$(File)\":$(Line):$(Column)";

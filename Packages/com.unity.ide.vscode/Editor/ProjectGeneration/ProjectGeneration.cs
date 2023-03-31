@@ -780,10 +780,6 @@ namespace VSCodeEditor
             string unityPath = Path.GetDirectoryName(EditorApplication.applicationPath);
             string libraryPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library"));
 
-            var btg = BuildPipeline.GetBuildTargetGroup(EditorUserBuildSettings.activeBuildTarget);
-            var apiCompatLevel = PlayerSettings.GetApiCompatibilityLevel(btg);
-            // string[] systemAssemblyDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
-
             // Debug.Log($"Unity dir: {unityPath}, library dir: {libraryPath}");
             // Debug.Log($"System assembly dirs: {string.Join("\n", systemAssemblyDirs)}");
 
