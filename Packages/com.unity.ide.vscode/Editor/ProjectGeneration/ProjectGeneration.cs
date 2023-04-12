@@ -264,11 +264,60 @@ namespace VSCodeEditor
 
                 OnGeneratedCSProjectFiles();
 
-                //So in theory we could get the data for every assembly, copying stuff into nativestrings
-                //and then generate everything is a parallelfor job.
-                //I wonder if that gives us any perf benefit.
-                NativeText output = new(1024, Allocator.TempJob);
-                NativeText headerTemplate = new(@"<Project Sdk=""Microsoft.NET.Sdk"">
+                // JobifiedSync();
+            }
+        }
+
+                void JobifiedSync()
+        {
+            //This generates a lot of garbage, but we can't avoid it.
+            //It's the only way to get this data as of 2021 LTS.
+            Assembly[] assemblies = CompilationPipeline.GetAssemblies();
+
+            foreach (Assembly assembly in assemblies)
+            {
+                //Skip empty assemblies, they don't need a csproj
+                if (assembly.sourceFiles.Length == 0) continue;
+
+                //alloc everything needed for the job:
+                //- assembly search paths
+                //- source files
+                //- references
+                //- project references
+                //- response file data
+
+                ApiCompatibilityLevel apiCompatLevel = assembly.compilerOptions.ApiCompatibilityLevel;
+                string[] systemReferenceDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
+
+                //references and defines that are in here need to be parsed out, otherwise
+                //intellisense won't pick them up even if the compiler will (same for nullable, it
+                //needs to go into the csproj proper)
+                string[] rspFilePaths = assembly.compilerOptions.ResponseFiles;
+                foreach (string rspPath in rspFilePaths)
+                {
+                    ResponseFileData rspData = CompilationPipeline.ParseResponseFile(rspPath,
+                        Directory.GetParent(Application.dataPath).FullName,
+                        systemReferenceDirs);
+                    
+                    //add rspData.Defines to defines
+                    //print rspData.Errors if there is any
+                    //read rspData.Unsafe
+                    //add rspData.FullPathReferences to references
+                    //check rspData.OtherArguments for nullable (do this with assembly.additionalCompilerOptions too)
+                    //add path to rsp file into csproj as well so compiler picks it up (only 1st though)
+                }
+
+                //run job
+
+                //dispose all the native stuff
+
+            }
+
+            //So in theory we could get the data for every assembly, copying stuff into nativestrings
+            //and then generate everything is a parallelfor job.
+            //I wonder if that gives us any perf benefit.
+            NativeText output = new(1024, Allocator.TempJob);
+            NativeText headerTemplate = new(@"<Project Sdk=""Microsoft.NET.Sdk"">
     <PropertyGroup>
         <TargetFramework>netstandard2.1</TargetFramework>
         <LangVersion>{0}</LangVersion>
@@ -285,27 +334,26 @@ namespace VSCodeEditor
         </AssemblySearchPaths>
         </PropertyGroup>
     <ItemGroup>", Allocator.TempJob);
-                NativeText defines = new("DEBUG;TRACE", Allocator.TempJob);
-                NativeText asmSearchPaths = new("Yo/this/is/a/path;This/is another one/;/thisispatrick", Allocator.TempJob);
+            NativeText defines = new("DEBUG;TRACE", Allocator.TempJob);
+            NativeText asmSearchPaths = new("Yo/this/is/a/path;This/is another one/;/thisispatrick", Allocator.TempJob);
 
-                GenerateProjectJob job = new()
-                {
-                    template = headerTemplate,
-                    defines = defines,
-                    unsafeCode = false,
-                    langVersion = "9.0",
-                    asmSearchPath = asmSearchPaths,
-                    output = output
-                };
-                JobHandle h = job.Schedule();
-                h.Complete();
-                Debug.Log(output.ToString());
+            GenerateProjectJob job = new()
+            {
+                template = headerTemplate,
+                defines = defines,
+                unsafeCode = false,
+                langVersion = "9.0",
+                asmSearchPath = asmSearchPaths,
+                output = output
+            };
+            JobHandle h = job.Schedule();
+            h.Complete();
+            Debug.Log(output.ToString());
 
-                output.Dispose();
-                headerTemplate.Dispose();
-                defines.Dispose();
-                asmSearchPaths.Dispose();
-            }
+            output.Dispose();
+            headerTemplate.Dispose();
+            defines.Dispose();
+            asmSearchPaths.Dispose();
         }
 
         public bool SolutionExists()
