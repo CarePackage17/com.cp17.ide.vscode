@@ -264,20 +264,116 @@ namespace VSCodeEditor
 
                 OnGeneratedCSProjectFiles();
 
-                // JobifiedSync();
+                JobifiedSync();
             }
         }
 
-                void JobifiedSync()
+        void JobifiedSync()
         {
             //This generates a lot of garbage, but we can't avoid it.
             //It's the only way to get this data as of 2021 LTS.
             Assembly[] assemblies = CompilationPipeline.GetAssemblies();
 
-            foreach (Assembly assembly in assemblies)
+            //These are always the same, so don't need to be in the loop
+            FixedString64Bytes definesFormatString = new("<DefineConstants>{0}</DefineConstants>\n");
+            FixedString64Bytes compileFormatString = new("<Compile Include=\"{0}\" />\n");
+            FixedString64Bytes referenceFormatString = new("<Reference Include=\"{0}\" />\n");
+            FixedString64Bytes itemGroupFormatString = new("<ItemGroup>\n{0}\n{1}\n</ItemGroup>\n");
+
+            FixedString4096Bytes propertyGroupFormatString =
+                new("<PropertyGroup>\n" +
+                        "<TargetFramework>netstandard2.1</TargetFramework>\n" + //make this configurable as well
+                        "<LangVersion>{0}</LangVersion>\n" +
+                        "<EnableDefaultItems>false</EnableDefaultItems>\n" +
+                        "<DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>\n" +
+                        "<GenerateAssemblyInfo>false</GenerateAssemblyInfo>\n" +
+                        "<Deterministic>true</Deterministic>\n" +
+                        "<OutputPath>Temp</OutputPath>\n" +
+                        "<AllowUnsafeBlocks>{1}</AllowUnsafeBlocks>\n" +
+                        "<AssemblySearchPaths>{2}</AssemblySearchPaths>\n" +
+                    "</PropertyGroup>\n");
+
+            for (int i = 0; i < assemblies.Length; i++)
             {
+                Assembly assembly = assemblies[i];
+
                 //Skip empty assemblies, they don't need a csproj
                 if (assembly.sourceFiles.Length == 0) continue;
+
+                ApiCompatibilityLevel apiCompatLevel = assembly.compilerOptions.ApiCompatibilityLevel;
+                string[] systemReferenceDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
+                string[] csDefines = assembly.defines;
+                string[] csSourceFiles = assembly.sourceFiles;
+                string[] csRefs = assembly.allReferences;
+                string langVersion = assembly.compilerOptions.LanguageVersion;
+                bool unsafeCode = assembly.compilerOptions.AllowUnsafeCode;
+
+                //so it turns out that NativeText is a container and it can't be in NativeArrays...
+                //well, then let's do one level of NativeText with internal separator chars.
+                //defines and search paths by ';', source files by ':'
+                NativeText defines = new(4096, Allocator.TempJob);
+                NativeText sourceFiles = new(8192, Allocator.TempJob);
+                NativeText searchPaths = new(8192, Allocator.TempJob);
+                NativeArray<FixedString4096Bytes> refs = new(csRefs.Length, Allocator.TempJob);
+                NativeText projectTextOutput = new(32 * 1024, Allocator.TempJob);
+                NativeList<int> searchPathHashes = new(64, Allocator.Temp);
+
+                int refIndex = 0;
+                foreach (string reference in csRefs)
+                {
+                    //the references we get here are full paths to dll files.
+                    //for sdk-style msbuild we just need the module names without the dll extension, but
+                    //the directory it's in needs to be added to the search path.
+                    var refFileName = Path.GetFileNameWithoutExtension(reference.AsSpan());
+
+                    //this will have duplicates. use hashing to get rid of them
+                    //we could do deduplication inside the job (if that ran on a worker it'd not block main as much)
+                    var searchPath = Path.GetDirectoryName(reference);
+                    int hash = searchPath.GetHashCode();
+                    if (!searchPathHashes.Contains(hash))
+                    {
+                        searchPathHashes.Add(hash);
+                        searchPaths.Append(searchPath);
+                        searchPaths.Append(';');
+                    }
+
+                    //come on, why can't we init a fixedstring from span :(
+                    refs[refIndex] = new(refFileName.ToString());
+                    refIndex++;
+                }
+
+                foreach (string filePath in csSourceFiles)
+                {
+                    //We concat with an illegal file path char in msbuild (any illegal windows path char should do)
+                    //https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
+                    sourceFiles.Append(filePath);
+                    sourceFiles.Append(':');
+                }
+
+                foreach (string define in csDefines)
+                {
+                    //Defines need to be in this format for the final output anyway.
+                    defines.Append(define);
+                    defines.Append(';');
+                }
+
+                GenerateProjectJob job = new()
+                {
+                    assemblyReferences = refs,
+                    defines = defines,
+                    definesFormatString = definesFormatString,
+                    files = sourceFiles,
+                    output = projectTextOutput,
+                    compileFormatString = compileFormatString,
+                    referenceFormatString = referenceFormatString,
+                    assemblySearchPaths = searchPaths,
+                    itemGroupFormatString = itemGroupFormatString,
+                    propertyGroupFormatString = propertyGroupFormatString,
+                    langVersion = new(langVersion),
+                    unsafeCode = unsafeCode
+                };
+
+                var handle = job.Schedule();
 
                 //alloc everything needed for the job:
                 //- assembly search paths
@@ -286,74 +382,48 @@ namespace VSCodeEditor
                 //- project references
                 //- response file data
 
-                ApiCompatibilityLevel apiCompatLevel = assembly.compilerOptions.ApiCompatibilityLevel;
-                string[] systemReferenceDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
 
-                //references and defines that are in here need to be parsed out, otherwise
-                //intellisense won't pick them up even if the compiler will (same for nullable, it
-                //needs to go into the csproj proper)
-                string[] rspFilePaths = assembly.compilerOptions.ResponseFiles;
-                foreach (string rspPath in rspFilePaths)
-                {
-                    ResponseFileData rspData = CompilationPipeline.ParseResponseFile(rspPath,
-                        Directory.GetParent(Application.dataPath).FullName,
-                        systemReferenceDirs);
-                    
-                    //add rspData.Defines to defines
-                    //print rspData.Errors if there is any
-                    //read rspData.Unsafe
-                    //add rspData.FullPathReferences to references
-                    //check rspData.OtherArguments for nullable (do this with assembly.additionalCompilerOptions too)
-                    //add path to rsp file into csproj as well so compiler picks it up (only 1st though)
-                }
+                // //references and defines that are in here need to be parsed out, otherwise
+                // //intellisense won't pick them up even if the compiler will (same for nullable, it
+                // //needs to go into the csproj proper)
+                // string[] rspFilePaths = assembly.compilerOptions.ResponseFiles;
+                // foreach (string rspPath in rspFilePaths)
+                // {
+                //     ResponseFileData rspData = CompilationPipeline.ParseResponseFile(rspPath,
+                //         Directory.GetParent(Application.dataPath).FullName,
+                //         systemReferenceDirs);
+
+                //     //add rspData.Defines to defines
+                //     //print rspData.Errors if there is any
+                //     //read rspData.Unsafe
+                //     //add rspData.FullPathReferences to references
+                //     //check rspData.OtherArguments for nullable (do this with assembly.additionalCompilerOptions too)
+                //     //add path to rsp file into csproj as well so compiler picks it up (only 1st though)
+                // }
 
                 //run job
+                handle.Complete();
+
+                //write output to file
+                string fileName = Path.Combine(ProjectDirectory, "Logs", $"{assembly.name}.test.csproj");
+                using (FileStream fs = File.OpenWrite(fileName))
+                {
+                    ReadOnlySpan<byte> data;
+                    unsafe
+                    {
+                        data = new(projectTextOutput.GetUnsafePtr(), projectTextOutput.Length);
+                    }
+
+                    fs.Write(data);
+                }
 
                 //dispose all the native stuff
-
+                projectTextOutput.Dispose();
+                searchPaths.Dispose();
+                defines.Dispose();
+                sourceFiles.Dispose();
+                refs.Dispose();
             }
-
-            //So in theory we could get the data for every assembly, copying stuff into nativestrings
-            //and then generate everything is a parallelfor job.
-            //I wonder if that gives us any perf benefit.
-            NativeText output = new(1024, Allocator.TempJob);
-            NativeText headerTemplate = new(@"<Project Sdk=""Microsoft.NET.Sdk"">
-    <PropertyGroup>
-        <TargetFramework>netstandard2.1</TargetFramework>
-        <LangVersion>{0}</LangVersion>
-        <EnableDefaultItems>false</EnableDefaultItems>
-        <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
-        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-        <Deterministic>true</Deterministic>
-        <OutputPath>Temp</OutputPath>
-        <DefineConstants>{1}</DefineConstants>
-        <AllowUnsafeBlocks>{2}</AllowUnsafeBlocks>
-        <AssemblySearchPaths>
-            {3};
-            $(AssemblySearchPaths)
-        </AssemblySearchPaths>
-        </PropertyGroup>
-    <ItemGroup>", Allocator.TempJob);
-            NativeText defines = new("DEBUG;TRACE", Allocator.TempJob);
-            NativeText asmSearchPaths = new("Yo/this/is/a/path;This/is another one/;/thisispatrick", Allocator.TempJob);
-
-            GenerateProjectJob job = new()
-            {
-                template = headerTemplate,
-                defines = defines,
-                unsafeCode = false,
-                langVersion = "9.0",
-                asmSearchPath = asmSearchPaths,
-                output = output
-            };
-            JobHandle h = job.Schedule();
-            h.Complete();
-            Debug.Log(output.ToString());
-
-            output.Dispose();
-            headerTemplate.Dispose();
-            defines.Dispose();
-            asmSearchPaths.Dispose();
         }
 
         public bool SolutionExists()

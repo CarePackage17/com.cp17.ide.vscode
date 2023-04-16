@@ -3,25 +3,75 @@ using Unity.Collections;
 
 struct GenerateProjectJob : IJob
 {
-    //we need some data here, probably using the collections package
-    //and nativetext.
-    [ReadOnly]
-    public NativeText template;
-    [ReadOnly]
-    public FixedString32Bytes langVersion;
-    [ReadOnly]
-    public bool unsafeCode;
-    [ReadOnly]
-    public NativeText asmSearchPath;
-
-    [ReadOnly]
-    public NativeText defines;
-
+    [ReadOnly] public FixedString64Bytes langVersion;
+    [ReadOnly] public bool unsafeCode;
+    [ReadOnly] public NativeText defines;
+    [ReadOnly] public NativeText files;
+    [ReadOnly] public NativeText assemblySearchPaths;
+    [ReadOnly] public NativeArray<FixedString4096Bytes> assemblyReferences;
+    [ReadOnly] public FixedString64Bytes definesFormatString;
+    [ReadOnly] public FixedString64Bytes compileFormatString;
+    [ReadOnly] public FixedString64Bytes referenceFormatString;
+    [ReadOnly] public FixedString64Bytes itemGroupFormatString;
+    [ReadOnly] public FixedString64Bytes projectFormatString;
+    [ReadOnly] public FixedString4096Bytes propertyGroupFormatString;
     public NativeText output;
 
     public void Execute()
     {
-        FixedString32Bytes allowUnsafe = new(unsafeCode.ToString());
-        output.AppendFormat(in template, langVersion, defines, allowUnsafe, asmSearchPath);
+        //write all cs files into <Compile /> items
+        int colonIndex = -1;
+        int startIndex = 0;
+        NativeText compileItemsXml = new(Allocator.Temp);
+
+        //I wish NativeText.IndexOf had Span support instead of fucking around with pointers
+        System.Span<byte> colon = stackalloc byte[1] { (byte)':' };
+
+        unsafe
+        {
+            fixed (byte* colonPtr = colon)
+            {
+                colonIndex = files.IndexOf(colonPtr, colon.Length, startIndex);
+            }
+        }
+
+        while (colonIndex != -1)
+        {
+            //get start/end indices
+            int length = colonIndex - startIndex;
+            NativeText tmp = new(length, Allocator.Temp);
+
+            //2.1 supports Substring, but we can't update if we want to target 2021 LTS...
+            //https://github.com/needle-mirror/com.unity.collections/blob/2.1.1/Unity.Collections/FixedStringMethods.cs#L43
+            //unsafe copy to tmp string that has the right length
+            unsafe { tmp.Append(files.GetUnsafePtr() + startIndex, length); }
+
+            compileItemsXml.AppendFormat(compileFormatString, tmp);
+
+            startIndex = colonIndex + 1;
+            unsafe
+            {
+                fixed (byte* colonPtr = colon)
+                {
+                    colonIndex = files.IndexOf(colonPtr, colon.Length, startIndex);
+                }
+            }
+        }
+
+        //write all refs into <Include /> items
+        NativeText referenceItems = new(Allocator.Temp);
+        for (int i = 0; i < assemblyReferences.Length; i++)
+        {
+            referenceItems.AppendFormat(referenceFormatString, assemblyReferences[i]);
+        }
+
+        //concat all into output
+        output.Append("<Project Sdk=\"Microsoft.NET.Sdk\">\n");
+        output.AppendFormat(propertyGroupFormatString, langVersion, new FixedString32Bytes(unsafeCode.ToString()), assemblySearchPaths);
+        output.AppendFormat(definesFormatString, defines);
+
+        //compile and reference belong in an itemgroup
+        output.AppendFormat(itemGroupFormatString, compileItemsXml, referenceItems);
+        output.Append("</Project>\n");
     }
 }
