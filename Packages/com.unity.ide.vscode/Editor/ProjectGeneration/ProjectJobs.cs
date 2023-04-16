@@ -3,6 +3,7 @@ using Unity.Collections;
 
 struct GenerateProjectJob : IJob
 {
+    [ReadOnly] public FixedString4096Bytes assemblyName;
     [ReadOnly] public FixedString64Bytes langVersion;
     [ReadOnly] public bool unsafeCode;
     [ReadOnly] public NativeText defines;

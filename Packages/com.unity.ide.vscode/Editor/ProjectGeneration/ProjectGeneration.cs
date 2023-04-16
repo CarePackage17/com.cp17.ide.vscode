@@ -278,7 +278,7 @@ namespace VSCodeEditor
             //It's the only way to get this data as of 2021 LTS.
             Assembly[] assemblies = CompilationPipeline.GetAssemblies();
 
-            //These are always the same, so don't need to be in the loop
+            //These are always the same, so don't need to be inside the loop
             FixedString64Bytes definesFormatString = new("<DefineConstants>{0}</DefineConstants>\n");
             FixedString64Bytes compileFormatString = new("<Compile Include=\"{0}\" />\n");
             FixedString64Bytes referenceFormatString = new("<Reference Include=\"{0}\" />\n");
@@ -296,6 +296,8 @@ namespace VSCodeEditor
                         "<AllowUnsafeBlocks>{1}</AllowUnsafeBlocks>\n" +
                         "<AssemblySearchPaths>{2}</AssemblySearchPaths>\n" +
                     "</PropertyGroup>\n");
+
+            List<(JobHandle, GenerateProjectJob)> jobList = new(assemblies.Length);
 
             for (int i = 0; i < assemblies.Length; i++)
             {
@@ -375,6 +377,7 @@ namespace VSCodeEditor
 
                 GenerateProjectJob job = new()
                 {
+                    assemblyName = new(assembly.name),
                     assemblyReferences = refs,
                     defines = defines,
                     definesFormatString = definesFormatString,
@@ -391,6 +394,7 @@ namespace VSCodeEditor
                 };
 
                 var handle = job.Schedule();
+                jobList.Add((handle, job));
 
                 //alloc everything needed for the job:
                 //- assembly search paths
@@ -419,28 +423,45 @@ namespace VSCodeEditor
                 // }
 
                 //run job
+                // handle.Complete();
+
+                // //dispose all the native stuff
+                // projectTextOutput.Dispose();
+                // searchPaths.Dispose();
+                // defines.Dispose();
+                // sourceFiles.Dispose();
+                // refs.Dispose();
+                // projectRefs.Dispose();
+            }
+
+            //complete all the jobs
+            //dispose all the things
+            foreach ((JobHandle handle, var jobData) in jobList)
+            {
                 handle.Complete();
+                var output = jobData.output;
+                var name = jobData.assemblyName;
 
                 //write output to file
-                string fileName = Path.Combine(ProjectDirectory, "Logs", $"{assembly.name}.test.csproj");
-                using (FileStream fs = File.Open(fileName, FileMode.Truncate, FileAccess.Write))
+                string fileName = Path.Combine(ProjectDirectory, "Logs", $"{name}.test.csproj");
+                using (FileStream fs = File.Open(fileName, FileMode.Create, FileAccess.Write))
                 {
                     ReadOnlySpan<byte> data;
                     unsafe
                     {
-                        data = new(projectTextOutput.GetUnsafePtr(), projectTextOutput.Length);
+                        data = new(output.GetUnsafePtr(), output.Length);
                     }
 
                     fs.Write(data);
                 }
 
-                //dispose all the native stuff
-                projectTextOutput.Dispose();
-                searchPaths.Dispose();
-                defines.Dispose();
-                sourceFiles.Dispose();
-                refs.Dispose();
-                projectRefs.Dispose();
+                jobData.defines.Dispose();
+                jobData.files.Dispose();
+                jobData.assemblySearchPaths.Dispose();
+                jobData.assemblyReferences.Dispose();
+                jobData.projectReferences.Dispose();
+
+                jobData.output.Dispose();
             }
         }
 
