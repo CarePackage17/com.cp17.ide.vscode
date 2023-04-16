@@ -88,7 +88,7 @@ struct GenerateProjectJob : IJob
         //compile and reference belong in an itemgroup
         output.AppendFormat(itemGroupFormatString, compileItemsXml, referenceItems);
 
-        //TODO: project references in their own itemgroup
+        //project references in their own itemgroup
         NativeText projectRefs = new(Allocator.Temp);
         for (int i = 0; i < projectReferences.Length; i++)
         {
