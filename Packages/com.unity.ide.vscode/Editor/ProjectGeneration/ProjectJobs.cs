@@ -1,11 +1,13 @@
 using Unity.Jobs;
 using Unity.Collections;
+using Unity.Burst;
 
+[BurstCompile]
 struct GenerateProjectJob : IJob
 {
     [ReadOnly] public FixedString4096Bytes assemblyName;
     [ReadOnly] public FixedString64Bytes langVersion;
-    [ReadOnly] public bool unsafeCode;
+    [ReadOnly] public FixedString32Bytes unsafeCode;
     [ReadOnly] public NativeText defines;
     [ReadOnly] public NativeText files;
     [ReadOnly] public NativeText assemblySearchPaths;
@@ -17,6 +19,15 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public FixedString64Bytes itemGroupFormatString;
     [ReadOnly] public FixedString64Bytes projectFormatString;
     [ReadOnly] public FixedString4096Bytes propertyGroupFormatString;
+
+    //These little strings are kinda ugly, but even though burst docs say they support
+    //initializing those from string literals, that doesn't seem to be the case here.
+    //Maybe collections 2.0 only? Anyway, that's not in scope for 2021 LTS.
+    [ReadOnly] public FixedString64Bytes projectElement;
+    [ReadOnly] public FixedString64Bytes projectEndElement;
+    [ReadOnly] public FixedString32Bytes itemGroupElement;
+    [ReadOnly] public FixedString32Bytes itemGroupEndElement;
+
     public NativeText output;
 
     public void Execute()
@@ -68,8 +79,10 @@ struct GenerateProjectJob : IJob
         }
 
         //concat all into output
-        output.Append("<Project Sdk=\"Microsoft.NET.Sdk\">\n");
-        output.AppendFormat(propertyGroupFormatString, langVersion, new FixedString32Bytes(unsafeCode.ToString()), assemblySearchPaths);
+        // FixedString64Bytes projectElement = "<Project Sdk=\"Microsoft.NET.Sdk\">\n";
+        output.Append(projectElement);
+
+        output.AppendFormat(propertyGroupFormatString, langVersion, unsafeCode, assemblySearchPaths);
         output.AppendFormat(definesFormatString, defines);
 
         //compile and reference belong in an itemgroup
@@ -87,11 +100,11 @@ struct GenerateProjectJob : IJob
         //there can be stuff without project references
         if (projectRefs.Length > 1)
         {
-            output.Append("<ItemGroup>\n");
+            output.Append(itemGroupElement);
             output.Append(projectRefs);
-            output.Append("</ItemGroup>\n");
+            output.Append(itemGroupEndElement);
         }
 
-        output.Append("</Project>\n");
+        output.Append(projectEndElement);
     }
 }

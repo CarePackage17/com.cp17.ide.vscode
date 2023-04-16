@@ -32,7 +32,8 @@
       "depth": 0,
       "source": "embedded",
       "dependencies": {
-        "com.unity.collections": "1.4.0"
+        "com.unity.collections": "1.4.0",
+        "com.unity.burst": "1.6.6"
       }
     },
     "com.unity.ide.vscode.tests": {

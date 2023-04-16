@@ -283,7 +283,12 @@ namespace VSCodeEditor
             FixedString64Bytes compileFormatString = new("<Compile Include=\"{0}\" />\n");
             FixedString64Bytes referenceFormatString = new("<Reference Include=\"{0}\" />\n");
             FixedString64Bytes itemGroupFormatString = new("<ItemGroup>\n{0}\n{1}\n</ItemGroup>\n");
-
+            FixedString64Bytes projectElement = new("<Project Sdk=\"Microsoft.NET.Sdk\">\n");
+            FixedString32Bytes projectEndElement = new("</Project>\n");
+            FixedString32Bytes itemGroupElement = new("<ItemGroup>\n");
+            FixedString32Bytes itemGroupEndElement = new("</ItemGroup>\n");
+            FixedString32Bytes trueStr = new("true");
+            FixedString32Bytes falseStr = new("false");
             FixedString4096Bytes propertyGroupFormatString =
                 new("<PropertyGroup>\n" +
                         "<TargetFramework>netstandard2.1</TargetFramework>\n" + //make this configurable as well
@@ -297,6 +302,7 @@ namespace VSCodeEditor
                         "<AssemblySearchPaths>{2}</AssemblySearchPaths>\n" +
                     "</PropertyGroup>\n");
 
+            //It'd be nicer if this was NativeArray but it doesn't like tuples :(
             List<(JobHandle, GenerateProjectJob)> jobList = new(assemblies.Length);
 
             for (int i = 0; i < assemblies.Length; i++)
@@ -389,8 +395,12 @@ namespace VSCodeEditor
                     itemGroupFormatString = itemGroupFormatString,
                     propertyGroupFormatString = propertyGroupFormatString,
                     langVersion = new(langVersion),
-                    unsafeCode = unsafeCode,
-                    projectReferences = projectRefs
+                    unsafeCode = unsafeCode ? trueStr : falseStr,
+                    projectReferences = projectRefs,
+                    projectElement = projectElement,
+                    projectEndElement = projectEndElement,
+                    itemGroupElement = itemGroupElement,
+                    itemGroupEndElement = itemGroupEndElement
                 };
 
                 var handle = job.Schedule();
@@ -421,17 +431,6 @@ namespace VSCodeEditor
                 //     //check rspData.OtherArguments for nullable (do this with assembly.additionalCompilerOptions too)
                 //     //add path to rsp file into csproj as well so compiler picks it up (only 1st though)
                 // }
-
-                //run job
-                // handle.Complete();
-
-                // //dispose all the native stuff
-                // projectTextOutput.Dispose();
-                // searchPaths.Dispose();
-                // defines.Dispose();
-                // sourceFiles.Dispose();
-                // refs.Dispose();
-                // projectRefs.Dispose();
             }
 
             //complete all the jobs
