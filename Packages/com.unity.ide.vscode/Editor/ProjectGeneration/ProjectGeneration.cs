@@ -301,6 +301,7 @@ namespace VSCodeEditor
                 if (assembly.sourceFiles.Length == 0) continue;
 
                 ApiCompatibilityLevel apiCompatLevel = assembly.compilerOptions.ApiCompatibilityLevel;
+                string projectGuid = ProjectGuid(assembly.name);
                 string[] systemReferenceDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
                 string[] csDefines = assembly.defines;
                 string[] csSourceFiles = assembly.sourceFiles;
@@ -315,6 +316,7 @@ namespace VSCodeEditor
                 NativeText sourceFiles = new(8192, Allocator.TempJob);
                 NativeText searchPaths = new(8192, Allocator.TempJob);
                 NativeArray<FixedString4096Bytes> refs = new(csRefs.Length, Allocator.TempJob);
+                NativeArray<FixedString4096Bytes> projectRefs = new(assembly.assemblyReferences.Length, Allocator.TempJob);
                 NativeText projectTextOutput = new(32 * 1024, Allocator.TempJob);
                 NativeList<int> searchPathHashes = new(64, Allocator.Temp);
 
@@ -357,6 +359,16 @@ namespace VSCodeEditor
                     defines.Append(';');
                 }
 
+                //These references are the ones set up via asmdef -> we want a project reference
+                //here. I think the assembly name should be enough? That's how we generate project names
+                //anyway, right?
+                int refIndex2 = 0;
+                foreach (Assembly a in assembly.assemblyReferences)
+                {
+                    projectRefs[refIndex2] = new(a.name);
+                    refIndex++;
+                }
+
                 GenerateProjectJob job = new()
                 {
                     assemblyReferences = refs,
@@ -370,7 +382,8 @@ namespace VSCodeEditor
                     itemGroupFormatString = itemGroupFormatString,
                     propertyGroupFormatString = propertyGroupFormatString,
                     langVersion = new(langVersion),
-                    unsafeCode = unsafeCode
+                    unsafeCode = unsafeCode,
+                    projectReferences = projectRefs
                 };
 
                 var handle = job.Schedule();
@@ -406,7 +419,7 @@ namespace VSCodeEditor
 
                 //write output to file
                 string fileName = Path.Combine(ProjectDirectory, "Logs", $"{assembly.name}.test.csproj");
-                using (FileStream fs = File.OpenWrite(fileName))
+                using (FileStream fs = File.Open(fileName, FileMode.Truncate, FileAccess.Write))
                 {
                     ReadOnlySpan<byte> data;
                     unsafe
@@ -423,6 +436,7 @@ namespace VSCodeEditor
                 defines.Dispose();
                 sourceFiles.Dispose();
                 refs.Dispose();
+                projectRefs.Dispose();
             }
         }
 

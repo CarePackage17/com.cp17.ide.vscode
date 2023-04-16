@@ -9,6 +9,7 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public NativeText files;
     [ReadOnly] public NativeText assemblySearchPaths;
     [ReadOnly] public NativeArray<FixedString4096Bytes> assemblyReferences;
+    [ReadOnly] public NativeArray<FixedString4096Bytes> projectReferences;
     [ReadOnly] public FixedString64Bytes definesFormatString;
     [ReadOnly] public FixedString64Bytes compileFormatString;
     [ReadOnly] public FixedString64Bytes referenceFormatString;
@@ -72,6 +73,24 @@ struct GenerateProjectJob : IJob
 
         //compile and reference belong in an itemgroup
         output.AppendFormat(itemGroupFormatString, compileItemsXml, referenceItems);
+
+        //TODO: project references in their own itemgroup
+        NativeText projectRefs = new(Allocator.Temp);
+        for (int i = 0; i < projectReferences.Length; i++)
+        {
+            var projectRefName = projectReferences[i];
+            projectRefName.AppendRawByte((byte)'\n');
+            projectRefs.Append(projectRefName);
+        }
+
+        //there can be stuff without project references
+        if (projectRefs.Length > 1)
+        {
+            output.Append("<ItemGroup>\n");
+            output.Append(projectRefs);
+            output.Append("</ItemGroup>\n");
+        }
+
         output.Append("</Project>\n");
     }
 }
