@@ -31,6 +31,7 @@ namespace VSCodeEditor
     {
         static ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
         static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
+        static ProfilerMarker s_jobifiedSnycMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
 
         enum ScriptingLanguage
         {
@@ -263,7 +264,10 @@ namespace VSCodeEditor
                 GenerateAndWriteSolutionAndProjects();
 
                 OnGeneratedCSProjectFiles();
+            }
 
+            using (s_jobifiedSnycMarker.Auto())
+            {
                 JobifiedSync();
             }
         }
@@ -507,19 +511,19 @@ namespace VSCodeEditor
                 var allProjectAssemblies = assemblies.ToList();
                 foreach (Assembly assembly in allProjectAssemblies)
                 {
-                    StringBuilder debugInfo = new();
+                    // StringBuilder debugInfo = new();
                     var api = assembly.compilerOptions.ApiCompatibilityLevel;
                     var lang = assembly.compilerOptions.LanguageVersion;
                     var additional = string.Join(' ', assembly.compilerOptions.AdditionalCompilerArguments);
                     //for deterministic comp there is ScriptCompilerOptions.UseDeterministicCompilation (internal)
                     //either fuck around with reflection or set it to true unconditionally, the assemblies dotnet build compiles
                     //aren't used by unity editor anyway
-                    debugInfo.AppendLine($"{assembly.name}:\nrootNamespace: {assembly.rootNamespace}");
-                    debugInfo.AppendLine($"ApiCompatibilityLevel: {api}, languageVersion: {lang}, additionalArgs: {additional}");
-                    debugInfo.AppendLine($"defines: {string.Join(';', assembly.defines)}");
-                    debugInfo.AppendLine($"sourceFiles: {string.Join(' ', assembly.sourceFiles)}");
-                    debugInfo.AppendLine($"allReferences: {string.Join(' ', assembly.allReferences)}");
-                    Debug.Log(debugInfo.ToString());
+                    // debugInfo.AppendLine($"{assembly.name}:\nrootNamespace: {assembly.rootNamespace}");
+                    // debugInfo.AppendLine($"ApiCompatibilityLevel: {api}, languageVersion: {lang}, additionalArgs: {additional}");
+                    // debugInfo.AppendLine($"defines: {string.Join(';', assembly.defines)}");
+                    // debugInfo.AppendLine($"sourceFiles: {string.Join(' ', assembly.sourceFiles)}");
+                    // debugInfo.AppendLine($"allReferences: {string.Join(' ', assembly.allReferences)}");
+                    // Debug.Log(debugInfo.ToString());
 
                     var responseFileData = ParseResponseFileData(assembly);
                     SyncProject(assembly, allAssetProjectParts, responseFileData);
