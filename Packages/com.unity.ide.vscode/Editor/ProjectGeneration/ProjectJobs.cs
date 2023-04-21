@@ -1,8 +1,13 @@
 using Unity.Jobs;
 using Unity.Collections;
 using Unity.Burst;
+using System.IO;
+using System;
 
-[BurstCompile]
+//DisposeSentinel takes some time in editor and we don't want users to fiddle with their settings to get better
+//perf. For debugging we can still force on, but disabling safety checks via attribute should shave off
+//some time here.
+[BurstCompile(/*DisableSafetyChecks = true*/)]
 struct GenerateProjectJob : IJob
 {
     [ReadOnly] public FixedString4096Bytes assemblyName;
@@ -106,5 +111,25 @@ struct GenerateProjectJob : IJob
         }
 
         output.Append(projectEndElement);
+    }
+}
+
+struct WriteToFileJob : IJob
+{
+    [ReadOnly] public NativeText content;
+    [ReadOnly] public FixedString4096Bytes filePath; //change this to nativetext to handle longer paths
+
+    public void Execute()
+    {
+        using (FileStream fs = File.Open(filePath.ConvertToString(), FileMode.Create, FileAccess.Write))
+        {
+            ReadOnlySpan<byte> data;
+            unsafe
+            {
+                data = new(content.GetUnsafePtr(), content.Length);
+            }
+
+            fs.Write(data);
+        }
     }
 }

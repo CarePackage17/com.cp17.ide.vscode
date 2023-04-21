@@ -381,7 +381,7 @@ namespace VSCodeEditor
                     refIndex++;
                 }
 
-                GenerateProjectJob job = new()
+                GenerateProjectJob generateJob = new()
                 {
                     assemblyName = new(assembly.name),
                     assemblyReferences = refs,
@@ -403,8 +403,16 @@ namespace VSCodeEditor
                     itemGroupEndElement = itemGroupEndElement
                 };
 
-                var handle = job.Schedule();
-                jobList.Add((handle, job));
+                WriteToFileJob writeJob = new()
+                {
+                    content = projectTextOutput,
+                    filePath = new FixedString4096Bytes(Path.Combine(ProjectDirectory, "Logs", $"{assembly.name}.csproj"))
+                };
+
+                var projHandle = generateJob.Schedule();
+                var handle = writeJob.Schedule(projHandle);
+
+                jobList.Add((handle, generateJob));
 
                 //alloc everything needed for the job:
                 //- assembly search paths
@@ -442,7 +450,7 @@ namespace VSCodeEditor
                 var name = jobData.assemblyName;
 
                 //write output to file
-                string fileName = Path.Combine(ProjectDirectory, "Logs", $"{name}.test.csproj");
+                string fileName = Path.Combine(ProjectDirectory, "Logs", $"{name}.csproj");
                 using (FileStream fs = File.Open(fileName, FileMode.Create, FileAccess.Write))
                 {
                     ReadOnlySpan<byte> data;
@@ -459,7 +467,6 @@ namespace VSCodeEditor
                 jobData.assemblySearchPaths.Dispose();
                 jobData.assemblyReferences.Dispose();
                 jobData.projectReferences.Dispose();
-
                 jobData.output.Dispose();
             }
         }
