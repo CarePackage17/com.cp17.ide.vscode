@@ -9,7 +9,7 @@ struct ProjectReferenceStrings
     public FixedString64Bytes projectReferenceStart;
     public FixedString32Bytes projectReferenceEnd;
     public FixedString32Bytes projectFormatString;
-    public FixedString32Bytes nameformatString;
+    public FixedString32Bytes nameFormatString;
 }
 
 //DisposeSentinel takes some time in editor and we don't want users to fiddle with their settings to get better
@@ -104,27 +104,28 @@ struct GenerateProjectJob : IJob
 
         //project references in their own itemgroup
         NativeText projectRefs = new(Allocator.Temp);
-        
-    //     <ProjectReference Include="Assembly-CSharp.csproj">
-    //   <Project>{29b64283-c21a-f655-ab7b-f58eb1e6716a}</Project>
-    //   <Name>Assembly-CSharp</Name>
-    // </ProjectReference>
+
+        // <ProjectReference Include="Assembly-CSharp.csproj">
+        //   <Project>{29b64283-c21a-f655-ab7b-f58eb1e6716a}</Project>
+        //   <Name>Assembly-CSharp</Name>
+        // </ProjectReference>
         for (int i = 0; i < projectReferences.Length; i++)
         {
-            var projectRefName = projectReferences[i];
+            FixedString4096Bytes projectRefName = projectReferences[i];
             projectRefs.AppendFormat(projectReferenceStrings.projectReferenceStart, projectRefName);
-            
+
             //TODO: generate guid for name
             // Guid g = new Guid();
             FixedString64Bytes mockGuid = new(new Unicode.Rune(0xFFFD), 12);
             projectRefs.AppendFormat(projectReferenceStrings.projectFormatString, mockGuid);
 
-            projectRefs.AppendFormat(projectReferenceStrings.nameformatString, projectRefName);
+            projectRefs.AppendFormat(projectReferenceStrings.nameFormatString, projectRefName);
             projectRefs.Append(projectReferenceStrings.projectReferenceEnd);
+            projectRefs.Add((byte)'\n');
         }
 
         //there can be projects without any project references
-        if (projectRefs.Length > 1)
+        if (projectReferences.Length > 0)
         {
             output.Append(itemGroupElement);
             output.Append(projectRefs);

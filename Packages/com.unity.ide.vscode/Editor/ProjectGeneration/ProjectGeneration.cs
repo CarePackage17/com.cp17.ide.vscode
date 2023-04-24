@@ -317,7 +317,8 @@ namespace VSCodeEditor
                 string[] systemReferenceDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
                 string[] csDefines = assembly.defines;
                 string[] csSourceFiles = assembly.sourceFiles;
-                string[] csRefs = assembly.allReferences;
+                string[] csRefs = assembly.compiledAssemblyReferences;
+                Assembly[] maybeAsmdefReferences = assembly.assemblyReferences;
                 string langVersion = assembly.compilerOptions.LanguageVersion;
                 bool unsafeCode = assembly.compilerOptions.AllowUnsafeCode;
 
@@ -328,7 +329,7 @@ namespace VSCodeEditor
                 NativeText sourceFiles = new(8192, Allocator.TempJob);
                 NativeText searchPaths = new(8192, Allocator.TempJob);
                 NativeArray<FixedString4096Bytes> refs = new(csRefs.Length, Allocator.TempJob);
-                NativeArray<FixedString4096Bytes> projectRefs = new(assembly.assemblyReferences.Length, Allocator.TempJob);
+                NativeArray<FixedString4096Bytes> projectRefs = new(maybeAsmdefReferences.Length, Allocator.TempJob);
                 NativeText projectTextOutput = new(32 * 1024, Allocator.TempJob);
                 NativeList<int> searchPathHashes = new(64, Allocator.Temp);
 
@@ -375,11 +376,10 @@ namespace VSCodeEditor
                 //here. I think the assembly name should be enough? That's how we generate project names
                 //anyway, right?
                 int refIndex2 = 0;
-                foreach (Assembly a in assembly.assemblyReferences)
+                foreach (Assembly a in maybeAsmdefReferences)
                 {
-                    // Debug.Log($"assembly reference: {a.name}");
                     projectRefs[refIndex2] = new(a.name);
-                    refIndex++;
+                    refIndex2++;
                 }
 
                 GenerateProjectJob generateJob = new()
@@ -404,7 +404,7 @@ namespace VSCodeEditor
                     itemGroupEndElement = itemGroupEndElement,
                     projectReferenceStrings = new()
                     {
-                        nameformatString = new("<Name>{0}</Name>"),
+                        nameFormatString = new("<Name>{0}</Name>"),
                         projectFormatString = new("<Project>{0}</Project>"),
                         projectReferenceStart = new("<ProjectReference Include=\"{0}.csproj\">"),
                         projectReferenceEnd = new("</ProjectReference>")
