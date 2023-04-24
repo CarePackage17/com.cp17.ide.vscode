@@ -31,7 +31,7 @@ namespace VSCodeEditor
     {
         static ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
         static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
-        static ProfilerMarker s_jobifiedSnycMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
+        static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
 
         enum ScriptingLanguage
         {
@@ -266,7 +266,7 @@ namespace VSCodeEditor
                 OnGeneratedCSProjectFiles();
             }
 
-            using (s_jobifiedSnycMarker.Auto())
+            using (s_jobifiedSyncMarker.Auto())
             {
                 JobifiedSync();
             }
@@ -377,6 +377,7 @@ namespace VSCodeEditor
                 int refIndex2 = 0;
                 foreach (Assembly a in assembly.assemblyReferences)
                 {
+                    // Debug.Log($"assembly reference: {a.name}");
                     projectRefs[refIndex2] = new(a.name);
                     refIndex++;
                 }
@@ -400,7 +401,14 @@ namespace VSCodeEditor
                     projectElement = projectElement,
                     projectEndElement = projectEndElement,
                     itemGroupElement = itemGroupElement,
-                    itemGroupEndElement = itemGroupEndElement
+                    itemGroupEndElement = itemGroupEndElement,
+                    projectReferenceStrings = new()
+                    {
+                        nameformatString = new("<Name>{0}</Name>"),
+                        projectFormatString = new("<Project>{0}</Project>"),
+                        projectReferenceStart = new("<ProjectReference Include=\"{0}.csproj\">"),
+                        projectReferenceEnd = new("</ProjectReference>")
+                    }
                 };
 
                 WriteToFileJob writeJob = new()

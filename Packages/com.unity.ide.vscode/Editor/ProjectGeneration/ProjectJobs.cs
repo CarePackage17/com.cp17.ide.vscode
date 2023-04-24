@@ -4,6 +4,14 @@ using Unity.Burst;
 using System.IO;
 using System;
 
+struct ProjectReferenceStrings
+{
+    public FixedString64Bytes projectReferenceStart;
+    public FixedString32Bytes projectReferenceEnd;
+    public FixedString32Bytes projectFormatString;
+    public FixedString32Bytes nameformatString;
+}
+
 //DisposeSentinel takes some time in editor and we don't want users to fiddle with their settings to get better
 //perf. For debugging we can still force on, but disabling safety checks via attribute should shave off
 //some time here.
@@ -32,6 +40,7 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public FixedString64Bytes projectEndElement;
     [ReadOnly] public FixedString32Bytes itemGroupElement;
     [ReadOnly] public FixedString32Bytes itemGroupEndElement;
+    [ReadOnly] public ProjectReferenceStrings projectReferenceStrings;
 
     public NativeText output;
 
@@ -95,14 +104,26 @@ struct GenerateProjectJob : IJob
 
         //project references in their own itemgroup
         NativeText projectRefs = new(Allocator.Temp);
+        
+    //     <ProjectReference Include="Assembly-CSharp.csproj">
+    //   <Project>{29b64283-c21a-f655-ab7b-f58eb1e6716a}</Project>
+    //   <Name>Assembly-CSharp</Name>
+    // </ProjectReference>
         for (int i = 0; i < projectReferences.Length; i++)
         {
             var projectRefName = projectReferences[i];
-            projectRefName.AppendRawByte((byte)'\n');
-            projectRefs.Append(projectRefName);
+            projectRefs.AppendFormat(projectReferenceStrings.projectReferenceStart, projectRefName);
+            
+            //TODO: generate guid for name
+            // Guid g = new Guid();
+            FixedString64Bytes mockGuid = new(new Unicode.Rune(0xFFFD), 12);
+            projectRefs.AppendFormat(projectReferenceStrings.projectFormatString, mockGuid);
+
+            projectRefs.AppendFormat(projectReferenceStrings.nameformatString, projectRefName);
+            projectRefs.Append(projectReferenceStrings.projectReferenceEnd);
         }
 
-        //there can be stuff without project references
+        //there can be projects without any project references
         if (projectRefs.Length > 1)
         {
             output.Append(itemGroupElement);
