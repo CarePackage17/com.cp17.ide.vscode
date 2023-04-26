@@ -22,6 +22,7 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public FixedString4096Bytes assemblyName;
     [ReadOnly] public FixedString64Bytes langVersion;
     [ReadOnly] public FixedString32Bytes unsafeCode;
+    //we could try to convert this into a parallelfor job by using unsafetext here
     [ReadOnly] public NativeText defines;
     [ReadOnly] public NativeText files;
     [ReadOnly] public NativeText assemblySearchPaths;
@@ -30,7 +31,6 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public FixedString64Bytes compileFormatString;
     [ReadOnly] public FixedString64Bytes referenceFormatString;
     [ReadOnly] public FixedString64Bytes itemGroupFormatString;
-    [ReadOnly] public FixedString64Bytes projectFormatString;
     [ReadOnly] public FixedString4096Bytes propertyGroupFormatString;
 
     //These little strings are kinda ugly, but even though burst docs say they support
@@ -179,3 +179,22 @@ struct WriteToFileJob : IJob
         }
     }
 }
+
+// Maybe this is overthinking. Let's do the easy thing first and go from there.
+// struct GenerateGuidJob : IJob
+// {
+//     [ReadOnly] public FixedString4096Bytes assemblyName;
+//     [WriteOnly] public FixedString64Bytes output;
+
+//     public void Execute()
+//     {
+//         Unity.Mathematics.uint4 hash = xxHash3.Hash128(assemblyName);
+//         var span = System.Runtime.InteropServices.MemoryMarshal.CreateReadOnlySpan(ref hash, 16);
+//         ReadOnlySpan<byte> guidBytes = MemoryMarshal.AsBytes(span);
+        
+//         Guid g = new(guidBytes);
+//         string guidStr = g.ToString();
+        
+//         output = new(guidStr);
+//     }
+// }
