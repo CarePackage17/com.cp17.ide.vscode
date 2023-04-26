@@ -27,7 +27,6 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public NativeText assemblySearchPaths;
     [ReadOnly] public NativeArray<FixedString4096Bytes> assemblyReferences;
     [ReadOnly] public NativeArray<FixedString4096Bytes> projectReferences;
-    [ReadOnly] public FixedString64Bytes definesFormatString;
     [ReadOnly] public FixedString64Bytes compileFormatString;
     [ReadOnly] public FixedString64Bytes referenceFormatString;
     [ReadOnly] public FixedString64Bytes itemGroupFormatString;
@@ -97,8 +96,7 @@ struct GenerateProjectJob : IJob
         // FixedString64Bytes projectElement = "<Project Sdk=\"Microsoft.NET.Sdk\">\n";
         output.Append(projectElement);
 
-        output.AppendFormat(propertyGroupFormatString, langVersion, unsafeCode, assemblySearchPaths);
-        output.AppendFormat(definesFormatString, defines);
+        output.AppendFormat(propertyGroupFormatString, langVersion, unsafeCode, assemblySearchPaths, defines);
 
         //compile and reference belong in an itemgroup
         output.AppendFormat(itemGroupFormatString, compileItemsXml, referenceItems);
@@ -126,6 +124,8 @@ struct GenerateProjectJob : IJob
             //aw fuck, this does decimal formatting only, but we need hex...
             //maybe we can copy-port out of here:
             //https://github.com/Unity-Technologies/mono/blob/2021.3.19f1/mcs/class/referencesource/mscorlib/system/guid.cs#L1194
+            //or we move this to a non-bursted job where we use managed APIs to do the work for us
+            //and pass the results into this...
             FixedString32Bytes a = new();
             a.Append(hash.x);
             FixedString32Bytes b = new();

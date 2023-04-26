@@ -279,7 +279,6 @@ namespace VSCodeEditor
             Assembly[] assemblies = CompilationPipeline.GetAssemblies();
 
             //These are always the same, so don't need to be inside the loop
-            FixedString64Bytes definesFormatString = new("<DefineConstants>{0}</DefineConstants>\n");
             FixedString64Bytes compileFormatString = new("<Compile Include=\"{0}\" />\n");
             FixedString64Bytes referenceFormatString = new("<Reference Include=\"{0}\" />\n");
             FixedString64Bytes itemGroupFormatString = new("<ItemGroup>\n{0}\n{1}\n</ItemGroup>\n");
@@ -300,6 +299,7 @@ namespace VSCodeEditor
                         "<OutputPath>Temp</OutputPath>\n" +
                         "<AllowUnsafeBlocks>{1}</AllowUnsafeBlocks>\n" +
                         "<AssemblySearchPaths>{2}</AssemblySearchPaths>\n" +
+                        "<DefineConstants>{3}</DefineConstants>\n" +
                     "</PropertyGroup>\n");
 
             //It'd be nicer if this was NativeArray but it doesn't like tuples :(
@@ -387,7 +387,6 @@ namespace VSCodeEditor
                     assemblyName = new(assembly.name),
                     assemblyReferences = refs,
                     defines = defines,
-                    definesFormatString = definesFormatString,
                     files = sourceFiles,
                     output = projectTextOutput,
                     compileFormatString = compileFormatString,
