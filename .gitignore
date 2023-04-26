@@ -21,7 +21,6 @@ TestVSCodePackage/Assets/Plugins
 
 Assets/Plugins*
 UserSettings/
-ProjectSettings/
 
 # Build results
 [Dd]ebug/
