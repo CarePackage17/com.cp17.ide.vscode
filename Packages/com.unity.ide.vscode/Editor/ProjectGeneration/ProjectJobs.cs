@@ -10,6 +10,7 @@ struct ProjectReferenceStrings
     public FixedString32Bytes projectReferenceEnd;
     public FixedString32Bytes projectFormatString;
     public FixedString32Bytes nameFormatString;
+    public FixedString64Bytes guidFormatString;
 }
 
 //DisposeSentinel takes some time in editor and we don't want users to fiddle with their settings to get better
@@ -115,16 +116,39 @@ struct GenerateProjectJob : IJob
             projectRefs.AppendFormat(projectReferenceStrings.projectReferenceStart, projectRefName);
 
             //TODO: generate guid for name
-            // Guid g = new Guid();
-            FixedString64Bytes mockGuid = new(new Unicode.Rune(0xFFFD), 12);
-            projectRefs.AppendFormat(projectReferenceStrings.projectFormatString, mockGuid);
+            //in unity's code this is done via MD5 class, but we can't use it with burst...
+            //I wonder if xxhash is ok here?
+            //according to random dude on SO, yes:
+            //https://stackoverflow.com/a/45789658
+            Unity.Mathematics.uint4 hash = xxHash3.Hash128(projectRefName);
+            FixedString64Bytes guidString = new();
 
+            //aw fuck, this does decimal formatting only, but we need hex...
+            //maybe we can copy-port out of here:
+            //https://github.com/Unity-Technologies/mono/blob/2021.3.19f1/mcs/class/referencesource/mscorlib/system/guid.cs#L1194
+            FixedString32Bytes a = new();
+            a.Append(hash.x);
+            FixedString32Bytes b = new();
+            b.Append(hash.y >> 16); //upper 16 bits
+            FixedString32Bytes c = new();
+            c.Append(hash.y & 0x00FF); //lower 16 bits
+            FixedString32Bytes d = new();
+            d.Append(hash.z >> 16);
+            FixedString32Bytes e = new();
+            e.Append(hash.z & 0x0FF);
+            e.Append(hash.w);
+
+            guidString.Add((byte)'{');
+            guidString.AppendFormat(projectReferenceStrings.guidFormatString, a, b, c, d, e);
+            guidString.Add((byte)'}');
+
+            projectRefs.AppendFormat(projectReferenceStrings.projectFormatString, guidString);
             projectRefs.AppendFormat(projectReferenceStrings.nameFormatString, projectRefName);
             projectRefs.Append(projectReferenceStrings.projectReferenceEnd);
             projectRefs.Add((byte)'\n');
         }
 
-        //there can be projects without any project references
+        //There can be projects without any project references. Don't write anything in that case.
         if (projectReferences.Length > 0)
         {
             output.Append(itemGroupElement);

@@ -407,7 +407,8 @@ namespace VSCodeEditor
                         nameFormatString = new("<Name>{0}</Name>"),
                         projectFormatString = new("<Project>{0}</Project>"),
                         projectReferenceStart = new("<ProjectReference Include=\"{0}.csproj\">"),
-                        projectReferenceEnd = new("</ProjectReference>")
+                        projectReferenceEnd = new("</ProjectReference>"),
+                        guidFormatString = new("{0}-{1}-{2}-{3}-{4}")
                     }
                 };
 
