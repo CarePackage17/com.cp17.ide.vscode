@@ -312,6 +312,12 @@ namespace VSCodeEditor
                 //Skip empty assemblies, they don't need a csproj
                 if (assembly.sourceFiles.Length == 0) continue;
 
+                //TODO: check settings if we should do anything at all for this assembly.
+                //e.g. ask package manager if it's asmdef is in an embedded package or something like that.
+                //so if we exclude an assembly, it shouldn't end up in projectReferences at all.
+                //I wonder if it's enough to just check the first source file path to see if it's in a package;
+                //I mean you can't have source files outside the package dir, can you? (what about asmref?)
+
                 ApiCompatibilityLevel apiCompatLevel = assembly.compilerOptions.ApiCompatibilityLevel;
                 string projectGuid = ProjectGuid(assembly.name);
                 string[] systemReferenceDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
@@ -439,23 +445,36 @@ namespace VSCodeEditor
                 //- response file data
 
 
-                // //references and defines that are in here need to be parsed out, otherwise
-                // //intellisense won't pick them up even if the compiler will (same for nullable, it
-                // //needs to go into the csproj proper)
-                // string[] rspFilePaths = assembly.compilerOptions.ResponseFiles;
-                // foreach (string rspPath in rspFilePaths)
-                // {
-                //     ResponseFileData rspData = CompilationPipeline.ParseResponseFile(rspPath,
-                //         Directory.GetParent(Application.dataPath).FullName,
-                //         systemReferenceDirs);
+                //references and defines that are in here need to be parsed out, otherwise
+                //intellisense won't pick them up even if the compiler will (same for nullable, it
+                //needs to go into the csproj proper)
+                string[] rspFilePaths = assembly.compilerOptions.ResponseFiles;
+                foreach (string rspPath in rspFilePaths)
+                {
+                    ResponseFileData rspData = CompilationPipeline.ParseResponseFile(rspPath,
+                        ProjectDirectory,
+                        systemReferenceDirs);
 
-                //     //add rspData.Defines to defines
-                //     //print rspData.Errors if there is any
-                //     //read rspData.Unsafe
-                //     //add rspData.FullPathReferences to references
-                //     //check rspData.OtherArguments for nullable (do this with assembly.additionalCompilerOptions too)
-                //     //add path to rsp file into csproj as well so compiler picks it up (only 1st though)
-                // }
+                    //add to defines
+                    string[] extraDefines = rspData.Defines;
+
+                    //print errors if there is any
+                    foreach (string error in rspData.Errors)
+                    {
+                        Debug.LogError(error);
+                    }
+
+                    //precedence: this or whatever assembly.compilerOptions says?
+                    bool allowUnsafe = rspData.Unsafe;
+
+                    //add to references
+                    string[] references = rspData.FullPathReferences;
+
+                    //check for nullable (do this with assembly.additionalCompilerOptions too)
+                    string[] otherArgs = rspData.OtherArguments;
+
+                    //add path to rsp file into csproj as well so compiler picks it up (only 1st though)
+                }
             }
 
             //complete all the jobs
