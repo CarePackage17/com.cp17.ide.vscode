@@ -153,14 +153,11 @@ namespace VSCodeEditor.Tests
 
         public SynchronizerBuilder WithRoslynAnalyzers(string[] roslynAnalyzerDllPaths)
         {
-#if !ROSLYN_ANALYZER_FIX
-            m_AssemblyProvider.Setup(x => x.GetRoslynAnalyzerPaths()).Returns(roslynAnalyzerDllPaths);
-#else
             foreach (var assembly in m_Assemblies)
             {
                 assembly.compilerOptions.RoslynAnalyzerDllPaths = roslynAnalyzerDllPaths;
             }
-#endif
+
             return this;
         }
     }

@@ -1051,11 +1051,7 @@ namespace VSCodeEditor
         {
             return otherArguments["analyzer"].Concat(otherArguments["a"])
                 .SelectMany(x => x.Split(';'))
-#if !ROSLYN_ANALYZER_FIX
-                .Concat(m_AssemblyNameProvider.GetRoslynAnalyzerPaths())
-#else
-        .Concat(assembly.compilerOptions.RoslynAnalyzerDllPaths)
-#endif
+                .Concat(assembly.compilerOptions.RoslynAnalyzerDllPaths)
                 .Select(MakeAbsolutePath)
                 .Distinct()
                 .ToArray();

@@ -1,10 +1,10 @@
 {
     "name": "Unity.VSCode.EditorTests",
+    "rootNamespace": "",
     "references": [
-		"Unity.VSCode.Editor"
-	],
-    "optionalUnityReferences": [
-        "TestAssemblies"
+        "Unity.VSCode.Editor",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
     ],
     "includePlatforms": [
         "Editor"
@@ -13,25 +13,13 @@
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
-        "Moq.dll"
+        "Moq.dll",
+        "nunit.framework.dll"
     ],
     "autoReferenced": false,
-    "defineConstraints": [],
-    "versionDefines": [
-        {
-            "name": "Unity",
-            "expression": "2021.2.0a9",
-            "define": "ROSLYN_ANALYZER_FIX"
-        },
-        {
-            "name": "Unity",
-            "expression": "[2021.1.2f1,2021.2.0a1]",
-            "define": "ROSLYN_ANALYZER_FIX"
-        },
-        {
-            "name": "Unity",
-            "expression": "[2020.3.6f1,2021.0]",
-            "define": "ROSLYN_ANALYZER_FIX"
-        }
-    ]
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
 }
