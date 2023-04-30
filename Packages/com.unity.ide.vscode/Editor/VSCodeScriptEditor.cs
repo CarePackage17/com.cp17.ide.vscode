@@ -15,7 +15,6 @@ namespace VSCodeEditor
         const string vscode_argument = "vscode_arguments";
         const string vscode_extension = "vscode_userExtensions";
         static readonly GUIContent k_ResetArguments = EditorGUIUtility.TrTextContent("Reset argument");
-        string m_Arguments = string.Empty;
         List<string> m_affectedFiles = new List<string>(128);
 
         IDiscovery m_Discoverability;
@@ -40,12 +39,8 @@ namespace VSCodeEditor
 
         string Arguments
         {
-            get => m_Arguments ?? (m_Arguments = EditorPrefs.GetString(vscode_argument, DefaultArgument));
-            set
-            {
-                m_Arguments = value;
-                EditorPrefs.SetString(vscode_argument, value);
-            }
+            get => EditorPrefs.GetString(vscode_argument, DefaultArgument);
+            set => EditorPrefs.SetString(vscode_argument, value);
         }
 
         static string[] defaultExtensions

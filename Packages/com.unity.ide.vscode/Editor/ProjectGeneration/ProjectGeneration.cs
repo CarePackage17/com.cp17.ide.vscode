@@ -360,12 +360,11 @@ namespace VSCodeEditor
                 //Add this to the end
                 searchPaths.Append("$(AssemblySearchPaths)");
 
-
                 foreach (string filePath in csSourceFiles)
                 {
                     //problem: we get paths like Packages/... but those don't exist on the file system;
                     //try this: https://docs.unity3d.com/Manual/upm-assets.html
-                    //It does aget absolute paths, relative to project dir should be fine for us though (and old code does that)
+                    //It does get absolute paths (Unity uses MonoIO to remap), we need relative to project dir (and old code does that)
                     string absolutePath = Path.GetFullPath(filePath);
                     string relativeToProject = Path.GetRelativePath(ProjectDirectory, absolutePath);
                     sourceFiles.Append(relativeToProject);
