@@ -13,6 +13,7 @@ using UnityEngine.Profiling;
 using Unity.Profiling;
 using Unity.Jobs;
 using Unity.Collections;
+using UnityEditor.PackageManager;
 
 namespace VSCodeEditor
 {
@@ -256,6 +257,21 @@ namespace VSCodeEditor
             return InvokeAssetPostProcessorGenerationCallbacks(nameof(OnGeneratedSlnSolution), path, content);
         }
 
+        static bool IsAssemblyIncluded(PackageSource source, ProjectGenerationFlag currentSetting)
+        {
+            return source switch
+            {
+                PackageSource.BuiltIn => currentSetting.HasFlag(ProjectGenerationFlag.BuiltIn),
+                PackageSource.Embedded => currentSetting.HasFlag(ProjectGenerationFlag.Embedded),
+                PackageSource.Git => currentSetting.HasFlag(ProjectGenerationFlag.Git),
+                PackageSource.Local => currentSetting.HasFlag(ProjectGenerationFlag.Local),
+                PackageSource.LocalTarball => currentSetting.HasFlag(ProjectGenerationFlag.LocalTarBall),
+                PackageSource.Registry => currentSetting.HasFlag(ProjectGenerationFlag.Registry),
+                PackageSource.Unknown => currentSetting.HasFlag(ProjectGenerationFlag.Unknown),
+                _ => false
+            };
+        }
+
         public void Sync()
         {
             using (s_syncMarker.Auto())
@@ -317,6 +333,19 @@ namespace VSCodeEditor
                 //so if we exclude an assembly, it shouldn't end up in projectReferences at all.
                 //I wonder if it's enough to just check the first source file path to see if it's in a package;
                 //I mean you can't have source files outside the package dir, can you? (what about asmref?)
+                var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(assembly.sourceFiles[0]);
+                if (packageInfo != null)
+                {
+                    PackageSource source = packageInfo.source;
+
+                    //check if user settings exclude sources, then skip processing assembly if it's excluded
+                    //assembly is excluded when its source is excluded in user settings
+                    //source excluded in settings when it doesn't have projectgenerationflag
+                    if (!IsAssemblyIncluded(source, m_AssemblyNameProvider.ProjectGenerationFlag))
+                    {
+                        Debug.Log($"{assembly.name} is from source {source} and should be excluded");
+                    }
+                }
 
                 ApiCompatibilityLevel apiCompatLevel = assembly.compilerOptions.ApiCompatibilityLevel;
                 string projectGuid = ProjectGuid(assembly.name);
