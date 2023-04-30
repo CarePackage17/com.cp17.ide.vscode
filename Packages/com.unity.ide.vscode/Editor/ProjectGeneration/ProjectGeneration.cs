@@ -329,7 +329,7 @@ namespace VSCodeEditor
                 NativeText sourceFiles = new(8192, Allocator.TempJob);
                 NativeText searchPaths = new(8192, Allocator.TempJob);
                 NativeArray<FixedString4096Bytes> refs = new(csRefs.Length, Allocator.TempJob);
-                NativeArray<FixedString4096Bytes> projectRefs = new(maybeAsmdefReferences.Length, Allocator.TempJob);
+                NativeArray<ProjectReference> projectRefs = new(maybeAsmdefReferences.Length, Allocator.TempJob);
                 NativeText projectTextOutput = new(32 * 1024, Allocator.TempJob);
                 NativeList<int> searchPathHashes = new(64, Allocator.Temp);
 
@@ -357,11 +357,21 @@ namespace VSCodeEditor
                     refIndex++;
                 }
 
+                //Add this to the end
+                searchPaths.Append("$(AssemblySearchPaths)");
+
+
                 foreach (string filePath in csSourceFiles)
                 {
+                    //problem: we get paths like Packages/... but those don't exist on the file system;
+                    //try this: https://docs.unity3d.com/Manual/upm-assets.html
+                    //It does aget absolute paths, relative to project dir should be fine for us though (and old code does that)
+                    string absolutePath = Path.GetFullPath(filePath);
+                    string relativeToProject = Path.GetRelativePath(ProjectDirectory, absolutePath);
+                    sourceFiles.Append(relativeToProject);
+
                     //We concat with an illegal file path char in msbuild (any illegal windows path char should do)
                     //https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
-                    sourceFiles.Append(filePath);
                     sourceFiles.Append(':');
                 }
 
@@ -378,7 +388,7 @@ namespace VSCodeEditor
                 int refIndex2 = 0;
                 foreach (Assembly a in maybeAsmdefReferences)
                 {
-                    projectRefs[refIndex2] = new(a.name);
+                    projectRefs[refIndex2] = new(a.name, ProjectGuid(a.name));
                     refIndex2++;
                 }
 
@@ -407,14 +417,14 @@ namespace VSCodeEditor
                         projectFormatString = new("<Project>{0}</Project>"),
                         projectReferenceStart = new("<ProjectReference Include=\"{0}.csproj\">"),
                         projectReferenceEnd = new("</ProjectReference>"),
-                        guidFormatString = new("{0}-{1}-{2}-{3}-{4}")
+                        // guidFormatString = new("{0}-{1}-{2}-{3}-{4}"),
                     }
                 };
 
                 WriteToFileJob writeJob = new()
                 {
                     content = projectTextOutput,
-                    filePath = new FixedString4096Bytes(Path.Combine(ProjectDirectory, "Logs", $"{assembly.name}.csproj"))
+                    filePath = new FixedString4096Bytes(Path.Combine(ProjectDirectory, $"{assembly.name}.csproj"))
                 };
 
                 var projHandle = generateJob.Schedule();
@@ -454,21 +464,6 @@ namespace VSCodeEditor
             foreach ((JobHandle handle, var jobData) in jobList)
             {
                 handle.Complete();
-                var output = jobData.output;
-                var name = jobData.assemblyName;
-
-                //write output to file
-                string fileName = Path.Combine(ProjectDirectory, "Logs", $"{name}.csproj");
-                using (FileStream fs = File.Open(fileName, FileMode.Create, FileAccess.Write))
-                {
-                    ReadOnlySpan<byte> data;
-                    unsafe
-                    {
-                        data = new(output.GetUnsafePtr(), output.Length);
-                    }
-
-                    fs.Write(data);
-                }
 
                 jobData.defines.Dispose();
                 jobData.files.Dispose();

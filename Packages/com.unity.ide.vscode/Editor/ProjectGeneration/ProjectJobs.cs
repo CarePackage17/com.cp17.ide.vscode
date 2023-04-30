@@ -10,7 +10,19 @@ struct ProjectReferenceStrings
     public FixedString32Bytes projectReferenceEnd;
     public FixedString32Bytes projectFormatString;
     public FixedString32Bytes nameFormatString;
-    public FixedString64Bytes guidFormatString;
+    // public FixedString64Bytes guidFormatString;
+}
+
+struct ProjectReference
+{
+    public FixedString4096Bytes name;
+    public FixedString64Bytes guid;
+
+    public ProjectReference(FixedString4096Bytes name, FixedString64Bytes guid)
+    {
+        this.name = name;
+        this.guid = guid;
+    }
 }
 
 //DisposeSentinel takes some time in editor and we don't want users to fiddle with their settings to get better
@@ -27,7 +39,7 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public NativeText files;
     [ReadOnly] public NativeText assemblySearchPaths;
     [ReadOnly] public NativeArray<FixedString4096Bytes> assemblyReferences;
-    [ReadOnly] public NativeArray<FixedString4096Bytes> projectReferences;
+    [ReadOnly] public NativeArray<ProjectReference> projectReferences;
     [ReadOnly] public FixedString64Bytes compileFormatString;
     [ReadOnly] public FixedString64Bytes referenceFormatString;
     [ReadOnly] public FixedString64Bytes itemGroupFormatString;
@@ -110,7 +122,8 @@ struct GenerateProjectJob : IJob
         // </ProjectReference>
         for (int i = 0; i < projectReferences.Length; i++)
         {
-            FixedString4096Bytes projectRefName = projectReferences[i];
+            ProjectReference projectRef = projectReferences[i];
+            var projectRefName = projectRef.name;
             projectRefs.AppendFormat(projectReferenceStrings.projectReferenceStart, projectRefName);
 
             //TODO: generate guid for name
@@ -118,31 +131,37 @@ struct GenerateProjectJob : IJob
             //I wonder if xxhash is ok here?
             //according to random dude on SO, yes:
             //https://stackoverflow.com/a/45789658
-            Unity.Mathematics.uint4 hash = xxHash3.Hash128(projectRefName);
+            // Unity.Mathematics.uint4 hash = xxHash3.Hash128(projectRefName);
             FixedString64Bytes guidString = new();
 
-            //aw fuck, this does decimal formatting only, but we need hex...
-            //maybe we can copy-port out of here:
-            //https://github.com/Unity-Technologies/mono/blob/2021.3.19f1/mcs/class/referencesource/mscorlib/system/guid.cs#L1194
-            //or we move this to a non-bursted job where we use managed APIs to do the work for us
-            //and pass the results into this...
-            FixedString32Bytes a = new();
-            a.Append(hash.x);
-            FixedString32Bytes b = new();
-            b.Append(hash.y >> 16); //upper 16 bits
-            FixedString32Bytes c = new();
-            c.Append(hash.y & 0x00FF); //lower 16 bits
-            FixedString32Bytes d = new();
-            d.Append(hash.z >> 16);
-            FixedString32Bytes e = new();
-            e.Append(hash.z & 0x0FF);
-            e.Append(hash.w);
+            // //aw fuck, this does decimal formatting only, but we need hex...
+            // //maybe we can copy-port out of here:
+            // //https://github.com/Unity-Technologies/mono/blob/2021.3.19f1/mcs/class/referencesource/mscorlib/system/guid.cs#L1194
+            // //or we move this to a non-bursted job where we use managed APIs to do the work for us
+            // //and pass the results into this...
+            // FixedString32Bytes a = new();
+            // a.Append(hash.x);
+            // FixedString32Bytes b = new();
+            // b.Append(hash.y >> 16); //upper 16 bits
+            // FixedString32Bytes c = new();
+            // c.Append(hash.y & 0x00FF); //lower 16 bits
+            // FixedString32Bytes d = new();
+            // d.Append(hash.z >> 16);
+            // FixedString32Bytes e = new();
+            // e.Append(hash.z & 0x0FF);
+            // e.Append(hash.w);
+
+            // guidString.Add((byte)'{');
+            // guidString.AppendFormat(projectReferenceStrings.guidFormatString, a, b, c, d, e);
+            // guidString.Add((byte)'}');
+
+            // projectRefs.AppendFormat(projectReferenceStrings.projectFormatString, guidString);
 
             guidString.Add((byte)'{');
-            guidString.AppendFormat(projectReferenceStrings.guidFormatString, a, b, c, d, e);
+            guidString.Append(projectRef.guid);
             guidString.Add((byte)'}');
-
             projectRefs.AppendFormat(projectReferenceStrings.projectFormatString, guidString);
+
             projectRefs.AppendFormat(projectReferenceStrings.nameFormatString, projectRefName);
             projectRefs.Append(projectReferenceStrings.projectReferenceEnd);
             projectRefs.Add((byte)'\n');
@@ -191,10 +210,10 @@ struct WriteToFileJob : IJob
 //         Unity.Mathematics.uint4 hash = xxHash3.Hash128(assemblyName);
 //         var span = System.Runtime.InteropServices.MemoryMarshal.CreateReadOnlySpan(ref hash, 16);
 //         ReadOnlySpan<byte> guidBytes = MemoryMarshal.AsBytes(span);
-        
+
 //         Guid g = new(guidBytes);
 //         string guidStr = g.ToString();
-        
+
 //         output = new(guidStr);
 //     }
 // }
