@@ -1,1 +1,3 @@
 -nullable:enable
+-r:System.Web.dll
+-d:YO_DAWG

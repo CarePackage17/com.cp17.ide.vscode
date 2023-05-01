@@ -472,6 +472,7 @@ namespace VSCodeEditor
 
                 //I wonder how we can have multiple response files affecting compilation...
                 //that'd be good for testing.
+                //https://github.com/dotnet/docs/blob/main/docs/csharp/language-reference/compiler-options/miscellaneous.md#responsefiles
                 foreach (string rspPath in rspFilePaths)
                 {
                     ResponseFileData rspData = CompilationPipeline.ParseResponseFile(rspPath,
@@ -480,6 +481,7 @@ namespace VSCodeEditor
 
                     rspStrings.Clear();
                     rspStrings.AppendLine($"{rspPath}:");
+
                     //add to defines
                     string[] extraDefines = rspData.Defines;
                     rspStrings.Append("Extra defines: ");
