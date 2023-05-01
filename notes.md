@@ -8,5 +8,6 @@
 - Support for player projects like VS and Rider
 - Check if we can use parallel jobs for the project generation stuff (probably requires UnsafeText, otherwise we can't store it in NativeArray)
 - Jobify sln write? (not really necessary from perf viewpoint)
+- Roslyn analyzer support?
 - Unit tests?
 - After jobified variant has parity, delete old stuff

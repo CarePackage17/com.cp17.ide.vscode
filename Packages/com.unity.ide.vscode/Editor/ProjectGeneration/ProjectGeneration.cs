@@ -478,31 +478,47 @@ namespace VSCodeEditor
                 //intellisense won't pick them up even if the compiler will (same for nullable, it
                 //needs to go into the csproj proper)
                 string[] rspFilePaths = assembly.compilerOptions.ResponseFiles;
+                StringBuilder rspStrings = new();
                 foreach (string rspPath in rspFilePaths)
                 {
                     ResponseFileData rspData = CompilationPipeline.ParseResponseFile(rspPath,
                         ProjectDirectory,
                         systemReferenceDirs);
 
+                    rspStrings.Clear();
+                    rspStrings.AppendLine($"{rspPath}:");
                     //add to defines
                     string[] extraDefines = rspData.Defines;
+                    rspStrings.Append("Extra defines: ");
+                    rspStrings.Append(string.Join(", ", extraDefines));
+                    rspStrings.AppendLine();
 
                     //print errors if there is any
-                    foreach (string error in rspData.Errors)
-                    {
-                        Debug.LogError(error);
-                    }
+                    string[] errors = rspData.Errors;
+                    rspStrings.Append("Errors: ");
+                    rspStrings.Append(string.Join('\n', errors));
+                    rspStrings.AppendLine();
 
                     //precedence: this or whatever assembly.compilerOptions says?
                     bool allowUnsafe = rspData.Unsafe;
+                    rspStrings.AppendLine($"Unsafe: {allowUnsafe}");
 
                     //add to references
                     string[] references = rspData.FullPathReferences;
+                    rspStrings.Append("Extra references: ");
+                    rspStrings.Append(string.Join(", ", references));
+                    rspStrings.AppendLine();
 
                     //check for nullable (do this with assembly.additionalCompilerOptions too)
+                    //support at least nullable and warnaserror like rider does:
+                    //https://github.com/needle-mirror/com.unity.ide.rider/blob/master/Rider/Editor/ProjectGeneration/ProjectGeneration.cs#L822
                     string[] otherArgs = rspData.OtherArguments;
+                    rspStrings.Append("Other args: ");
+                    rspStrings.Append(string.Join(", ", otherArgs));
+                    rspStrings.AppendLine();
 
-                    //add path to rsp file into csproj as well so compiler picks it up (only 1st though)
+                    //TODO: add path to rsp file into csproj as well so compiler picks it up (only 1st though)
+                    Debug.Log(rspStrings.ToString());
                 }
             }
 
