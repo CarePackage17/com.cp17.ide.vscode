@@ -466,19 +466,14 @@ namespace VSCodeEditor
 
                 jobList.Add((handle, generateJob));
 
-                //alloc everything needed for the job:
-                //- assembly search paths
-                //- source files
-                //- references
-                //- project references
-                //- response file data
-
-
                 //references and defines that are in here need to be parsed out, otherwise
                 //intellisense won't pick them up even if the compiler will (same for nullable, it
                 //needs to go into the csproj proper)
                 string[] rspFilePaths = assembly.compilerOptions.ResponseFiles;
                 StringBuilder rspStrings = new();
+
+                //I wonder how we can have multiple response files affecting compilation...
+                //that'd be good for testing.
                 foreach (string rspPath in rspFilePaths)
                 {
                     ResponseFileData rspData = CompilationPipeline.ParseResponseFile(rspPath,
