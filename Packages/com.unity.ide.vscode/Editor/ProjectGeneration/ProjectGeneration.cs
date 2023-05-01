@@ -328,9 +328,7 @@ namespace VSCodeEditor
                 //Skip empty assemblies, they don't need a csproj
                 if (assembly.sourceFiles.Length == 0) continue;
 
-                //TODO: check settings if we should do anything at all for this assembly.
-                //e.g. ask package manager if it's asmdef is in an embedded package or something like that.
-                //so if we exclude an assembly, it shouldn't end up in projectReferences at all.
+                //Check settings if we should do anything at all for this assembly.
                 //I wonder if it's enough to just check the first source file path to see if it's in a package;
                 //I mean you can't have source files outside the package dir, can you? (what about asmref?)
                 var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(assembly.sourceFiles[0]);
