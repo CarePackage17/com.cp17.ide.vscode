@@ -290,9 +290,14 @@ namespace VSCodeEditor
 
         void JobifiedSync()
         {
+            AssembliesType assembliesType = AssembliesType.Editor;
+            //TODO: check settings and pass AssembliesType.Player if the user selected that
+            //here's how rider does it:
+            //https://github.com/needle-mirror/com.unity.ide.rider/blob/master/Rider/Editor/ProjectGeneration/AssemblyNameProvider.cs#L56
+
             //This generates a lot of garbage, but we can't avoid it.
             //It's the only way to get this data as of 2021 LTS.
-            Assembly[] assemblies = CompilationPipeline.GetAssemblies();
+            Assembly[] assemblies = CompilationPipeline.GetAssemblies(assembliesType);
 
             //These are always the same, so don't need to be inside the loop
             FixedString64Bytes compileFormatString = new("<Compile Include=\"{0}\" />\n");
@@ -473,6 +478,9 @@ namespace VSCodeEditor
                 //I wonder how we can have multiple response files affecting compilation...
                 //that'd be good for testing.
                 //https://github.com/dotnet/docs/blob/main/docs/csharp/language-reference/compiler-options/miscellaneous.md#responsefiles
+                //So how do we pass this stuff into the generation job? Do we have an extra struct with this data?
+                //Do we preprocess and just add it to the existing arrays? (will probably break if there's multiple rsp files)
+                //Extra struct is probably easier, but needs more memory management...
                 foreach (string rspPath in rspFilePaths)
                 {
                     ResponseFileData rspData = CompilationPipeline.ParseResponseFile(rspPath,
