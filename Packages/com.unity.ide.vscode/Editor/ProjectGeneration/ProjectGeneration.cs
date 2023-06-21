@@ -299,6 +299,39 @@ namespace VSCodeEditor
             //It's the only way to get this data as of 2021 LTS.
             Assembly[] assemblies = CompilationPipeline.GetAssemblies(assembliesType);
 
+            NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies = new(assemblies.Length, Allocator.TempJob);
+            //Before generating anything, we need to know all the assemblies that are excluded from project
+            //generation, otherwise we won't be able to set up references correctly. So it's another loop
+            //before the generation loop.
+            for (int i = 0; i < assemblies.Length; i++)
+            {
+                Assembly assembly = assemblies[i];
+                //Check settings if we should do anything at all for this assembly.
+                //I wonder if it's enough to just check the first source file path to see if it's in a package;
+                //I mean you can't have source files outside the package dir, can you? (what about asmref?)
+                var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(assembly.sourceFiles[0]);
+                if (packageInfo != null)
+                {
+                    PackageSource source = packageInfo.source;
+
+                    //check if user settings exclude sources, then skip processing assembly if it's excluded
+                    //assembly is excluded when its source is excluded in user settings
+                    //source excluded in settings when it doesn't have projectgenerationflag
+                    if (!IsAssemblyIncluded(source, m_AssemblyNameProvider.ProjectGenerationFlag))
+                    {
+                        //This is not enough; instead of using ProjectReference, we need to use Reference for
+                        //the assemblies that are excluded from project generation because the dependency
+                        //doesn't go away.
+                        //Also, assembly search path needs Library/ScriptAssemblies (maybe there's a way to do that without hardcoding).
+                        //So I guess we'll need a NativeArray/NativeList with excluded project names so the gen job
+                        //can take that into account and does not write the ProjectReference section.
+                        Debug.Log($"{assembly.name} is from source {source} and should be excluded");
+                        excludedAssemblies.Add(new(assembly.name));
+                        continue;
+                    }
+                }
+            }
+
             //These are always the same, so don't need to be inside the loop
             FixedString64Bytes compileFormatString = new("<Compile Include=\"{0}\" />\n");
             FixedString64Bytes referenceFormatString = new("<Reference Include=\"{0}\" />\n");
@@ -332,30 +365,6 @@ namespace VSCodeEditor
 
                 //Skip empty assemblies, they don't need a csproj
                 if (assembly.sourceFiles.Length == 0) continue;
-
-                //Check settings if we should do anything at all for this assembly.
-                //I wonder if it's enough to just check the first source file path to see if it's in a package;
-                //I mean you can't have source files outside the package dir, can you? (what about asmref?)
-                var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(assembly.sourceFiles[0]);
-                if (packageInfo != null)
-                {
-                    PackageSource source = packageInfo.source;
-
-                    //check if user settings exclude sources, then skip processing assembly if it's excluded
-                    //assembly is excluded when its source is excluded in user settings
-                    //source excluded in settings when it doesn't have projectgenerationflag
-                    if (!IsAssemblyIncluded(source, m_AssemblyNameProvider.ProjectGenerationFlag))
-                    {
-                        //This is not enough; instead of using ProjectReference, we need to use Reference for
-                        //the assemblies that are excluded from project generation because the dependency
-                        //doesn't go away.
-                        //Also, assembly search path needs Library/ScriptAssemblies (maybe there's a way to do that without hardcoding).
-                        //So I guess we'll need a NativeArray/NativeList with excluded project names so the gen job
-                        //can take that into account and does not write the ProjectReference section.
-                        Debug.Log($"{assembly.name} is from source {source} and should be excluded");
-                        continue;
-                    }
-                }
 
                 ApiCompatibilityLevel apiCompatLevel = assembly.compilerOptions.ApiCompatibilityLevel;
                 string projectGuid = ProjectGuid(assembly.name);
@@ -401,6 +410,12 @@ namespace VSCodeEditor
                     refs[refIndex] = new(refFileName.ToString());
                     refIndex++;
                 }
+
+                //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
+                //generated for them (excluded by user setting).
+                string scriptAssembliesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies"));
+                searchPaths.Append(scriptAssembliesPath);
+                searchPaths.Append(';');
 
                 //Add this to the end
                 searchPaths.Append("$(AssemblySearchPaths)");
@@ -455,6 +470,7 @@ namespace VSCodeEditor
                     projectEndElement = projectEndElement,
                     itemGroupElement = itemGroupElement,
                     itemGroupEndElement = itemGroupEndElement,
+                    excludedAssemblies = excludedAssemblies,
                     projectReferenceStrings = new()
                     {
                         nameFormatString = new("<Name>{0}</Name>"),
@@ -545,6 +561,8 @@ namespace VSCodeEditor
                 jobData.projectReferences.Dispose();
                 jobData.output.Dispose();
             }
+
+            excludedAssemblies.Dispose();
         }
 
         public bool SolutionExists()

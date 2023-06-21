@@ -44,6 +44,8 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public FixedString64Bytes referenceFormatString;
     [ReadOnly] public FixedString64Bytes itemGroupFormatString;
     [ReadOnly] public FixedString4096Bytes propertyGroupFormatString;
+    //excluded from project generation
+    [ReadOnly] public NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies;
 
     //These little strings are kinda ugly, but even though burst docs say they support
     //initializing those from string literals, that doesn't seem to be the case here.
@@ -104,15 +106,6 @@ struct GenerateProjectJob : IJob
             referenceItems.AppendFormat(referenceFormatString, assemblyReferences[i]);
         }
 
-        //concat all into output
-        // FixedString64Bytes projectElement = "<Project Sdk=\"Microsoft.NET.Sdk\">\n";
-        output.Append(projectElement);
-
-        output.AppendFormat(propertyGroupFormatString, langVersion, unsafeCode, assemblySearchPaths, defines);
-
-        //compile and reference belong in an itemgroup
-        output.AppendFormat(itemGroupFormatString, compileItemsXml, referenceItems);
-
         //project references in their own itemgroup
         NativeText projectRefs = new(Allocator.Temp);
 
@@ -123,6 +116,14 @@ struct GenerateProjectJob : IJob
         for (int i = 0; i < projectReferences.Length; i++)
         {
             ProjectReference projectRef = projectReferences[i];
+
+            //If the referenced project is excluded from generation we want a regular reference instead of projectreference
+            if (excludedAssemblies.Contains(projectRef.name))
+            {
+                referenceItems.AppendFormat(referenceFormatString, projectRef.name);
+                continue;
+            }
+
             var projectRefName = projectRef.name;
             projectRefs.AppendFormat(projectReferenceStrings.projectReferenceStart, projectRefName);
 
@@ -166,6 +167,17 @@ struct GenerateProjectJob : IJob
             projectRefs.Append(projectReferenceStrings.projectReferenceEnd);
             projectRefs.Add((byte)'\n');
         }
+
+        //concat all into output
+        // FixedString64Bytes projectElement = "<Project Sdk=\"Microsoft.NET.Sdk\">\n";
+        output.Append(projectElement);
+
+        output.AppendFormat(propertyGroupFormatString, langVersion, unsafeCode, assemblySearchPaths, defines);
+
+        //compile and reference belong in an itemgroup
+        output.AppendFormat(itemGroupFormatString, compileItemsXml, referenceItems);
+
+
 
         //There can be projects without any project references. Don't write anything in that case.
         if (projectReferences.Length > 0)
