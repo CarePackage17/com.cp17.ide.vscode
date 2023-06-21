@@ -1,6 +1,11 @@
+# Installation
+
+- Open package manager UI
+- Add from git URL, then paste: git+https://github.com/CarePackage17/com.unity.ide.vscode?path=/Packages/com.unity.ide.vscode#sdk-style
+
 # TODO
 
-- Respect user settings instead of generating all the projects all the time
+- ~~Respect user settings instead of generating all the projects all the time~~
 - Parse stuff from response files and add into the project (nullable, extra files, compiler switches, etc.)
 - Clean up code (it's pretty ugly rn)
 - Test on Windows
