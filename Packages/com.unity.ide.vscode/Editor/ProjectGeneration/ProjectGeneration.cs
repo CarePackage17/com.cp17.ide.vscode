@@ -325,7 +325,7 @@ namespace VSCodeEditor
                         //Also, assembly search path needs Library/ScriptAssemblies (maybe there's a way to do that without hardcoding).
                         //So I guess we'll need a NativeArray/NativeList with excluded project names so the gen job
                         //can take that into account and does not write the ProjectReference section.
-                        Debug.Log($"{assembly.name} is from source {source} and should be excluded");
+                        // Debug.Log($"{assembly.name} is from source {source} and should be excluded");
                         excludedAssemblies.Add(new(assembly.name));
                         continue;
                     }
