@@ -14,6 +14,7 @@ using Unity.Profiling;
 using Unity.Jobs;
 using Unity.Collections;
 using UnityEditor.PackageManager;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace VSCodeEditor
 {
@@ -33,6 +34,10 @@ namespace VSCodeEditor
         static ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
         static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
         static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
+
+        //These don't change at runtime, so we can cache them once and use them forever.
+        static string[] s_netStandardAssemblyDirectories = CompilationPipeline.GetSystemAssemblyDirectories(ApiCompatibilityLevel.NET_Standard);
+        static string[] s_net48AssemblyDirectories = CompilationPipeline.GetSystemAssemblyDirectories(ApiCompatibilityLevel.NET_Unity_4_8);
 
         enum ScriptingLanguage
         {
@@ -274,19 +279,21 @@ namespace VSCodeEditor
 
         public void Sync()
         {
-            using (s_syncMarker.Auto())
-            {
-                SetupProjectSupportedExtensions();
-                GenerateAndWriteSolutionAndProjects();
+            // using (s_syncMarker.Auto())
+            // {
+            //     SetupProjectSupportedExtensions();
+            //     GenerateAndWriteSolutionAndProjects();
 
-                OnGeneratedCSProjectFiles();
-            }
+            //     OnGeneratedCSProjectFiles();
+            // }
 
             using (s_jobifiedSyncMarker.Auto())
             {
                 JobifiedSync();
             }
         }
+
+        static ProfilerMarker s_excludedAssemblyMarker = new("GetExcludedAssemblies");
 
         void JobifiedSync()
         {
@@ -299,6 +306,8 @@ namespace VSCodeEditor
             //It's the only way to get this data as of 2021 LTS.
             Assembly[] assemblies = CompilationPipeline.GetAssemblies(assembliesType);
 
+            s_excludedAssemblyMarker.Begin();
+            //We can definitely cache this too, user settings change doesn't happen often usually.
             NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies = new(assemblies.Length, Allocator.TempJob);
             //Before generating anything, we need to know all the assemblies that are excluded from project
             //generation, otherwise we won't be able to set up references correctly. So it's another loop
@@ -332,6 +341,13 @@ namespace VSCodeEditor
                 }
             }
 
+            s_excludedAssemblyMarker.End();
+
+            //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
+            //generated for them (excluded by user setting).
+            string scriptAssembliesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies"));
+            string[] systemReferenceDirs;
+
             //These are always the same, so don't need to be inside the loop
             FixedString64Bytes compileFormatString = new("<Compile Include=\"{0}\" />\n");
             FixedString64Bytes referenceFormatString = new("<Reference Include=\"{0}\" />\n");
@@ -362,13 +378,34 @@ namespace VSCodeEditor
             for (int i = 0; i < assemblies.Length; i++)
             {
                 Assembly assembly = assemblies[i];
+                if (excludedAssemblies.Contains(new(assembly.name)))
+                {
+                    Debug.Log($"{assembly.name} should be excluded");
+                    continue;
+                }
 
                 //Skip empty assemblies, they don't need a csproj
                 if (assembly.sourceFiles.Length == 0) continue;
 
                 ApiCompatibilityLevel apiCompatLevel = assembly.compilerOptions.ApiCompatibilityLevel;
                 string projectGuid = ProjectGuid(assembly.name);
-                string[] systemReferenceDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
+
+                //this can be moved out of the loop and preallocated for the most common api levels
+                //(netstandard and unity4_8) so we generate less garbage
+                if (apiCompatLevel == ApiCompatibilityLevel.NET_Standard)
+                {
+                    systemReferenceDirs = s_netStandardAssemblyDirectories;
+                }
+                else if (apiCompatLevel == ApiCompatibilityLevel.NET_Unity_4_8)
+                {
+                    systemReferenceDirs = s_net48AssemblyDirectories;
+                }
+                else
+                {
+                    //slow path, shouldn't really end up here
+                    systemReferenceDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
+                }
+
                 string[] csDefines = assembly.defines;
                 string[] csSourceFiles = assembly.sourceFiles;
                 string[] csRefs = assembly.compiledAssemblyReferences;
@@ -380,7 +417,8 @@ namespace VSCodeEditor
                 //well, then let's do one level of NativeText with internal separator chars.
                 //defines and search paths by ';', source files by ':'
                 NativeText defines = new(4096, Allocator.TempJob);
-                NativeText sourceFiles = new(8192, Allocator.TempJob);
+                // NativeText sourceFiles = new(8192, Allocator.TempJob);
+                NativeList<UnsafeList<char>> sourceFilesUtf16 = new(8192, Allocator.TempJob);
                 NativeText searchPaths = new(8192, Allocator.TempJob);
                 NativeArray<FixedString4096Bytes> refs = new(csRefs.Length, Allocator.TempJob);
                 NativeArray<ProjectReference> projectRefs = new(maybeAsmdefReferences.Length, Allocator.TempJob);
@@ -393,7 +431,7 @@ namespace VSCodeEditor
                     //the references we get here are full paths to dll files.
                     //for sdk-style msbuild we just need the module names without the dll extension, but
                     //the directory it's in needs to be added to the search path.
-                    var refFileName = Path.GetFileNameWithoutExtension(reference.AsSpan());
+                    var refFileName = Path.GetFileNameWithoutExtension(reference);
 
                     //this will have duplicates. use hashing to get rid of them
                     //we could do deduplication inside the job (if that ran on a worker it'd not block main as much)
@@ -411,9 +449,6 @@ namespace VSCodeEditor
                     refIndex++;
                 }
 
-                //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
-                //generated for them (excluded by user setting).
-                string scriptAssembliesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies"));
                 searchPaths.Append(scriptAssembliesPath);
                 searchPaths.Append(';');
 
@@ -427,11 +462,17 @@ namespace VSCodeEditor
                     //It does get absolute paths (Unity uses MonoIO to remap), we need relative to project dir (and old code does that)
                     string absolutePath = Path.GetFullPath(filePath);
                     string relativeToProject = Path.GetRelativePath(ProjectDirectory, absolutePath);
-                    sourceFiles.Append(relativeToProject);
 
-                    //We concat with an illegal file path char in msbuild (any illegal windows path char should do)
-                    //https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
-                    sourceFiles.Append(':');
+                    //The job should dispose this after conversion
+                    UnsafeList<char> uft16Path = new(relativeToProject.Length, Allocator.TempJob);
+                    unsafe
+                    {
+                        fixed (char* pathToCopyPtr = relativeToProject.AsSpan())
+                        {
+                            uft16Path.AddRange(pathToCopyPtr, relativeToProject.Length);
+                        }
+                    }
+                    sourceFilesUtf16.Add(uft16Path);
                 }
 
                 foreach (string define in csDefines)
@@ -456,7 +497,7 @@ namespace VSCodeEditor
                     assemblyName = new(assembly.name),
                     assemblyReferences = refs,
                     defines = defines,
-                    files = sourceFiles,
+                    utf16Files = sourceFilesUtf16,
                     output = projectTextOutput,
                     compileFormatString = compileFormatString,
                     referenceFormatString = referenceFormatString,
@@ -555,7 +596,8 @@ namespace VSCodeEditor
                 handle.Complete();
 
                 jobData.defines.Dispose();
-                jobData.files.Dispose();
+                // jobData.files.Dispose();
+                jobData.utf16Files.Dispose();
                 jobData.assemblySearchPaths.Dispose();
                 jobData.assemblyReferences.Dispose();
                 jobData.projectReferences.Dispose();

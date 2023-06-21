@@ -3,6 +3,7 @@ using Unity.Collections;
 using Unity.Burst;
 using System.IO;
 using System;
+using Unity.Collections.LowLevel.Unsafe;
 
 struct ProjectReferenceStrings
 {
@@ -36,7 +37,7 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public FixedString32Bytes unsafeCode;
     //we could try to convert this into a parallelfor job by using unsafetext here
     [ReadOnly] public NativeText defines;
-    [ReadOnly] public NativeText files;
+    [ReadOnly] public NativeList<UnsafeList<char>> utf16Files;
     [ReadOnly] public NativeText assemblySearchPaths;
     [ReadOnly] public NativeArray<FixedString4096Bytes> assemblyReferences;
     [ReadOnly] public NativeArray<ProjectReference> projectReferences;
@@ -60,43 +61,36 @@ struct GenerateProjectJob : IJob
 
     public void Execute()
     {
-        //write all cs files into <Compile /> items
-        int colonIndex = -1;
-        int startIndex = 0;
         NativeText compileItemsXml = new(Allocator.Temp);
 
-        //I wish NativeText.IndexOf had Span support instead of fucking around with pointers
-        System.Span<byte> colon = stackalloc byte[1] { (byte)':' };
-
-        unsafe
+        //write all cs files into <Compile /> items, like this:
+        //<Compile Include="Packages/com.unity.ide.vscode/Editor/ProjectGeneration/ProjectGeneration.cs" />
+        //<Compile Include="Packages/com.unity.ide.vscode/Editor/ProjectGeneration/FileIO.cs" />
+        //...
+        NativeText sourceFileTextUtf8 = new(4096, Allocator.Temp);
+        for (int i = 0; i < utf16Files.Length; i++)
         {
-            fixed (byte* colonPtr = colon)
-            {
-                colonIndex = files.IndexOf(colonPtr, colon.Length, startIndex);
-            }
-        }
-
-        while (colonIndex != -1)
-        {
-            //get start/end indices
-            int length = colonIndex - startIndex;
-            NativeText tmp = new(length, Allocator.Temp);
-
-            //2.1 supports Substring, but we can't update if we want to target 2021 LTS...
-            //https://github.com/needle-mirror/com.unity.collections/blob/2.1.1/Unity.Collections/FixedStringMethods.cs#L43
-            //unsafe copy to tmp string that has the right length
-            unsafe { tmp.Append(files.GetUnsafePtr() + startIndex, length); }
-
-            compileItemsXml.AppendFormat(compileFormatString, tmp);
-
-            startIndex = colonIndex + 1;
+            sourceFileTextUtf8.Clear();
+            UnsafeList<char> filePathUtf16 = utf16Files[i];
             unsafe
             {
-                fixed (byte* colonPtr = colon)
+                byte* destPtr = sourceFileTextUtf8.GetUnsafePtr();
+                CopyError err = UTF8ArrayUnsafeUtility.Copy(destPtr, out int destLength, sourceFileTextUtf8.Length, filePathUtf16.Ptr, filePathUtf16.Length);
+
+                if (err == CopyError.Truncation)
                 {
-                    colonIndex = files.IndexOf(colonPtr, colon.Length, startIndex);
+                    //Resize buffer and try again...once
+                    if (sourceFileTextUtf8.TryResize(filePathUtf16.Length))
+                    {
+                        err = UTF8ArrayUnsafeUtility.Copy(destPtr, out destLength, sourceFileTextUtf8.Length, filePathUtf16.Ptr, filePathUtf16.Length);
+                    }
                 }
             }
+
+            //Don't forget to dispose!
+            filePathUtf16.Dispose();
+
+            compileItemsXml.AppendFormat(compileFormatString, sourceFileTextUtf8);
         }
 
         //write all refs into <Include /> items
