@@ -619,7 +619,7 @@ namespace VSCodeEditor
             GenerateSlnJob slnJob = new()
             {
                 slnHeader = new("Microsoft Visual Studio Solution File, Format Version 12.00"),
-                projectFormatString = new("Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"{0}\", \"{0}.csproj\", \"{1}\"\nEndProject\n"),
+                projectFormatString = new("Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"{0}\", \"{0}.csproj\", \"{ {1} }\"\nEndProject\n"),
                 projectsInSln = projectsInSln,
                 output = slnText
             };

@@ -234,6 +234,23 @@ struct GenerateSlnJob : IJob
 
         //TODO: see if we can get away with not writing a global section
         //and add it if needed.
+        //We need a global section, otherwise dotnet build doesn't know what to do
+
+        //We need a block like this:
+        //GlobalSection(SolutionConfigurationPlatforms) = preSolution
+        // 	Debug|Any CPU = Debug|Any CPU
+        // EndGlobalSection
+
+        //and another one like this:
+        //GlobalSection(ProjectConfigurationPlatforms) = postSolution
+        // 	{98f2dd1b-074b-cf3b-5f2d-f208ae635e6d}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        // 	{98f2dd1b-074b-cf3b-5f2d-f208ae635e6d}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        // 	{6902571f-3a69-cc40-44fe-2cf06c5cba36}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        // 	{6902571f-3a69-cc40-44fe-2cf06c5cba36}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        // 	{0af454fe-e3d5-234b-8e33-50684044af23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        // 	{0af454fe-e3d5-234b-8e33-50684044af23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        // ...
+        // EndGlobalSection
     }
 }
 
