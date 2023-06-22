@@ -9,7 +9,6 @@ using System.Text;
 using UnityEditor;
 using UnityEditor.Compilation;
 using UnityEngine;
-using UnityEngine.Profiling;
 using Unity.Profiling;
 using Unity.Jobs;
 using Unity.Collections;
@@ -171,34 +170,37 @@ namespace VSCodeEditor
         /// </param>
         public bool SyncIfNeeded(List<string> affectedFiles, string[] reimportedFiles)
         {
-            Profiler.BeginSample("SolutionSynchronizerSync");
-            SetupProjectSupportedExtensions();
+            //TODO: restore this after figuring out how Unity calls stuff
 
-            if (!HasFilesBeenModified(affectedFiles, reimportedFiles))
-            {
-                Profiler.EndSample();
-                return false;
-            }
+            // Profiler.BeginSample("SolutionSynchronizerSync");
+            // SetupProjectSupportedExtensions();
 
-            var assemblies = m_AssemblyNameProvider.GetAssemblies(ShouldFileBePartOfSolution);
-            var allProjectAssemblies = assemblies.ToList();
-            SyncSolution(allProjectAssemblies);
+            // if (!HasFilesBeenModified(affectedFiles, reimportedFiles))
+            // {
+            //     Profiler.EndSample();
+            //     return false;
+            // }
 
-            var allAssetProjectParts = GenerateAllAssetProjectParts();
+            // var assemblies = m_AssemblyNameProvider.GetAssemblies(ShouldFileBePartOfSolution);
+            // var allProjectAssemblies = assemblies.ToList();
+            // SyncSolution(allProjectAssemblies);
 
-            var affectedNames = affectedFiles.Select(asset => m_AssemblyNameProvider.GetAssemblyNameFromScriptPath(asset)).Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name.Split(new[] { ".dll" }, StringSplitOptions.RemoveEmptyEntries)[0]);
-            var reimportedNames = reimportedFiles.Select(asset => m_AssemblyNameProvider.GetAssemblyNameFromScriptPath(asset)).Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name.Split(new[] { ".dll" }, StringSplitOptions.RemoveEmptyEntries)[0]);
-            var affectedAndReimported = new HashSet<string>(affectedNames.Concat(reimportedNames));
+            // var allAssetProjectParts = GenerateAllAssetProjectParts();
 
-            foreach (var assembly in allProjectAssemblies)
-            {
-                if (!affectedAndReimported.Contains(assembly.name))
-                    continue;
+            // var affectedNames = affectedFiles.Select(asset => m_AssemblyNameProvider.GetAssemblyNameFromScriptPath(asset)).Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name.Split(new[] { ".dll" }, StringSplitOptions.RemoveEmptyEntries)[0]);
+            // var reimportedNames = reimportedFiles.Select(asset => m_AssemblyNameProvider.GetAssemblyNameFromScriptPath(asset)).Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name.Split(new[] { ".dll" }, StringSplitOptions.RemoveEmptyEntries)[0]);
+            // var affectedAndReimported = new HashSet<string>(affectedNames.Concat(reimportedNames));
 
-                SyncProject(assembly, allAssetProjectParts, ParseResponseFileData(assembly));
-            }
+            // foreach (var assembly in allProjectAssemblies)
+            // {
+            //     if (!affectedAndReimported.Contains(assembly.name))
+            //         continue;
 
-            Profiler.EndSample();
+            //     SyncProject(assembly, allAssetProjectParts, ParseResponseFileData(assembly));
+            // }
+
+            // Profiler.EndSample();
+
             return true;
         }
 
@@ -228,13 +230,13 @@ namespace VSCodeEditor
                 .Where(m => m != null);
         }
 
-        static void OnGeneratedCSProjectFiles()
-        {
-            foreach (var method in GetPostProcessorCallbacks(nameof(OnGeneratedCSProjectFiles)))
-            {
-                method.Invoke(null, Array.Empty<object>());
-            }
-        }
+        // static void OnGeneratedCSProjectFiles()
+        // {
+        //     foreach (var method in GetPostProcessorCallbacks(nameof(OnGeneratedCSProjectFiles)))
+        //     {
+        //         method.Invoke(null, Array.Empty<object>());
+        //     }
+        // }
 
         static string InvokeAssetPostProcessorGenerationCallbacks(string name, string path, string content)
         {
@@ -297,6 +299,8 @@ namespace VSCodeEditor
 
         void JobifiedSync()
         {
+            Debug.Log($"Running {nameof(JobifiedSync)}");
+
             AssembliesType assembliesType = AssembliesType.Editor;
             //TODO: check settings and pass AssembliesType.Player if the user selected that
             //here's how rider does it:
@@ -366,6 +370,7 @@ namespace VSCodeEditor
 
             //It'd be nicer if this was NativeArray but it doesn't like tuples :(
             List<(JobHandle, GenerateProjectJob)> jobList = new(assemblies.Length);
+            NativeList<ProjectReference> projectsInSln = new(64, Allocator.TempJob);
 
             for (int i = 0; i < assemblies.Length; i++)
             {
@@ -381,6 +386,9 @@ namespace VSCodeEditor
 
                 ApiCompatibilityLevel apiCompatLevel = assembly.compilerOptions.ApiCompatibilityLevel;
                 string projectGuid = ProjectGuid(assembly.name);
+
+                FixedString4096Bytes assemblyName = new(assembly.name);
+                projectsInSln.Add(new(assemblyName, new FixedString64Bytes(projectGuid)));
 
                 //this can be moved out of the loop and preallocated for the most common api levels
                 //(netstandard and unity4_8) so we generate less garbage
@@ -588,7 +596,6 @@ namespace VSCodeEditor
                 handle.Complete();
 
                 jobData.defines.Dispose();
-                // jobData.files.Dispose();
                 jobData.utf16Files.Dispose();
                 jobData.assemblySearchPaths.Dispose();
                 jobData.assemblyReferences.Dispose();
@@ -596,7 +603,7 @@ namespace VSCodeEditor
                 jobData.output.Dispose();
             }
 
-            // JobifiedCreateSln();
+            JobifiedCreateSln(projectsInSln);
 
             excludedAssemblies.Dispose();
         }
@@ -606,20 +613,18 @@ namespace VSCodeEditor
             return m_FileIOProvider.Exists(SolutionFile());
         }
 
-        void JobifiedCreateSln()
+        void JobifiedCreateSln(NativeList<ProjectReference> projectsInSln)
         {
             NativeText slnText = new(8192, Allocator.TempJob);
             GenerateSlnJob slnJob = new()
             {
                 slnHeader = new("Microsoft Visual Studio Solution File, Format Version 12.00"),
-                projectFormatString = new("Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"{0}\", \"{0}.csproj\", \"{1}\"\nEndProject"),
-                // we need to somehow collect all the projects that are gonna end up in the sln before getting here
-                // projectsInSln =
+                projectFormatString = new("Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"{0}\", \"{0}.csproj\", \"{1}\"\nEndProject\n"),
+                projectsInSln = projectsInSln,
                 output = slnText
             };
 
             string slnPath = Path.Combine(ProjectDirectory, $"{Path.GetFileName(ProjectDirectory)}.sln");
-            Debug.Log("sln path: " + slnPath);
 
             WriteToFileJob writeSlnJob = new()
             {
@@ -630,6 +635,7 @@ namespace VSCodeEditor
             writeSlnJob.Schedule(slnJob.Schedule()).Complete();
 
             slnText.Dispose();
+            projectsInSln.Dispose();
         }
 
         void SetupProjectSupportedExtensions()

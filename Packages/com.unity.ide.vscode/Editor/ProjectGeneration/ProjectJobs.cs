@@ -217,19 +217,20 @@ struct GenerateSlnJob : IJob
     [ReadOnly] public FixedString4096Bytes projectFormatString;
 
     //maybe rename projectreference to something that fits both cases
-    // [ReadOnly] public NativeList<ProjectReference> projectsInSln;
+    [ReadOnly] public NativeList<ProjectReference> projectsInSln;
 
     public NativeText output;
 
     public void Execute()
     {
         output.Append(slnHeader);
+        output.Add((byte)'\n');
 
-        // for (int i = 0; i < projectsInSln.Length; i++)
-        // {
-        //     var projData = projectsInSln[i];
-        //     output.AppendFormat(projectFormatString, projData.name, projData.guid);
-        // }
+        for (int i = 0; i < projectsInSln.Length; i++)
+        {
+            var projData = projectsInSln[i];
+            output.AppendFormat(projectFormatString, projData.name, projData.guid);
+        }
 
         //TODO: see if we can get away with not writing a global section
         //and add it if needed.
