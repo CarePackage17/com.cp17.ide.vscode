@@ -207,14 +207,32 @@ struct WriteToFileJob : IJob
 
 struct GenerateSlnJob : IJob
 {
-    [ReadOnly] FixedString128Bytes cSharpProjectGuid;
-    [ReadOnly] FixedString4096Bytes projectName;
-    [ReadOnly] FixedString4096Bytes slnName;
+    //Microsoft Visual Studio Solution File, Format Version 12.00
+    [ReadOnly] public FixedString512Bytes slnHeader;
+
+    //Format for a single C# project looks like this:
+    //Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "{0}", "{0}.csproj", "{1}"
+    //EndProject
+    //with {0} being the project name and {1} being the project GUID
+    [ReadOnly] public FixedString4096Bytes projectFormatString;
+
+    //maybe rename projectreference to something that fits both cases
+    // [ReadOnly] public NativeList<ProjectReference> projectsInSln;
+
+    public NativeText output;
 
     public void Execute()
     {
-        //TODO: string formatting go brrrr
-        throw new NotImplementedException();
+        output.Append(slnHeader);
+
+        // for (int i = 0; i < projectsInSln.Length; i++)
+        // {
+        //     var projData = projectsInSln[i];
+        //     output.AppendFormat(projectFormatString, projData.name, projData.guid);
+        // }
+
+        //TODO: see if we can get away with not writing a global section
+        //and add it if needed.
     }
 }
 

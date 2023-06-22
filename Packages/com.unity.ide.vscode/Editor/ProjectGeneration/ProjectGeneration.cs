@@ -596,12 +596,40 @@ namespace VSCodeEditor
                 jobData.output.Dispose();
             }
 
+            // JobifiedCreateSln();
+
             excludedAssemblies.Dispose();
         }
 
         public bool SolutionExists()
         {
             return m_FileIOProvider.Exists(SolutionFile());
+        }
+
+        void JobifiedCreateSln()
+        {
+            NativeText slnText = new(8192, Allocator.TempJob);
+            GenerateSlnJob slnJob = new()
+            {
+                slnHeader = new("Microsoft Visual Studio Solution File, Format Version 12.00"),
+                projectFormatString = new("Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"{0}\", \"{0}.csproj\", \"{1}\"\nEndProject"),
+                // we need to somehow collect all the projects that are gonna end up in the sln before getting here
+                // projectsInSln =
+                output = slnText
+            };
+
+            string slnPath = Path.Combine(ProjectDirectory, $"{Path.GetFileName(ProjectDirectory)}.sln");
+            Debug.Log("sln path: " + slnPath);
+
+            WriteToFileJob writeSlnJob = new()
+            {
+                content = slnText,
+                filePath = new FixedString4096Bytes(slnPath)
+            };
+
+            writeSlnJob.Schedule(slnJob.Schedule()).Complete();
+
+            slnText.Dispose();
         }
 
         void SetupProjectSupportedExtensions()
