@@ -328,15 +328,7 @@ namespace VSCodeEditor
                     //source excluded in settings when it doesn't have projectgenerationflag
                     if (!IsAssemblyIncluded(source, m_AssemblyNameProvider.ProjectGenerationFlag))
                     {
-                        //This is not enough; instead of using ProjectReference, we need to use Reference for
-                        //the assemblies that are excluded from project generation because the dependency
-                        //doesn't go away.
-                        //Also, assembly search path needs Library/ScriptAssemblies (maybe there's a way to do that without hardcoding).
-                        //So I guess we'll need a NativeArray/NativeList with excluded project names so the gen job
-                        //can take that into account and does not write the ProjectReference section.
-                        // Debug.Log($"{assembly.name} is from source {source} and should be excluded");
                         excludedAssemblies.Add(new(assembly.name));
-                        continue;
                     }
                 }
             }

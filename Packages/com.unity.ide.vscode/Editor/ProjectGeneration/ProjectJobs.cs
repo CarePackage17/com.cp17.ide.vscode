@@ -205,6 +205,19 @@ struct WriteToFileJob : IJob
     }
 }
 
+struct GenerateSlnJob : IJob
+{
+    [ReadOnly] FixedString128Bytes cSharpProjectGuid;
+    [ReadOnly] FixedString4096Bytes projectName;
+    [ReadOnly] FixedString4096Bytes slnName;
+
+    public void Execute()
+    {
+        //TODO: string formatting go brrrr
+        throw new NotImplementedException();
+    }
+}
+
 // Maybe this is overthinking. Let's do the easy thing first and go from there.
 // struct GenerateGuidJob : IJob
 // {
