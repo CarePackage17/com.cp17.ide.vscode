@@ -34,17 +34,13 @@ struct GenerateProjectJob : IJob
 {
     [ReadOnly] public FixedString4096Bytes assemblyName;
     [ReadOnly] public FixedString64Bytes langVersion;
-    [ReadOnly] public FixedString32Bytes unsafeCode;
+    [ReadOnly] public bool unsafeCode;
     //we could try to convert this into a parallelfor job by using unsafetext here
     [ReadOnly] public NativeText defines;
     [ReadOnly] public NativeList<UnsafeList<char>> utf16Files;
     [ReadOnly] public NativeText assemblySearchPaths;
     [ReadOnly] public NativeArray<FixedString4096Bytes> assemblyReferences;
     [ReadOnly] public NativeArray<ProjectReference> projectReferences;
-    [ReadOnly] public FixedString64Bytes compileFormatString;
-    [ReadOnly] public FixedString64Bytes referenceFormatString;
-    [ReadOnly] public FixedString64Bytes itemGroupFormatString;
-    [ReadOnly] public FixedString4096Bytes propertyGroupFormatString;
     //excluded from project generation
     [ReadOnly] public NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies;
 
@@ -62,6 +58,8 @@ struct GenerateProjectJob : IJob
     public void Execute()
     {
         NativeText compileItemsXml = new(Allocator.Temp);
+
+        FixedString32Bytes compileFormatString = "<Compile Include=\"{0}\" />\n";
 
         //write all cs files into <Compile /> items, like this:
         //<Compile Include="Packages/com.unity.ide.vscode/Editor/ProjectGeneration/ProjectGeneration.cs" />
@@ -95,6 +93,8 @@ struct GenerateProjectJob : IJob
 
         //write all refs into <Include /> items
         NativeText referenceItems = new(Allocator.Temp);
+        FixedString32Bytes referenceFormatString = "<Reference Include=\"{0}\" />\n";
+
         for (int i = 0; i < assemblyReferences.Length; i++)
         {
             referenceItems.AppendFormat(referenceFormatString, assemblyReferences[i]);
@@ -166,12 +166,24 @@ struct GenerateProjectJob : IJob
         // FixedString64Bytes projectElement = "<Project Sdk=\"Microsoft.NET.Sdk\">\n";
         output.Append(projectElement);
 
-        output.AppendFormat(propertyGroupFormatString, langVersion, unsafeCode, assemblySearchPaths, defines);
+        FixedString4096Bytes propertyGroupFormatString = "<PropertyGroup>\n" +
+                        "<TargetFramework>netstandard2.1</TargetFramework>\n" + //make this configurable as well
+                        "<LangVersion>{0}</LangVersion>\n" +
+                        "<EnableDefaultItems>false</EnableDefaultItems>\n" +
+                        "<DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>\n" +
+                        "<GenerateAssemblyInfo>false</GenerateAssemblyInfo>\n" +
+                        "<Deterministic>true</Deterministic>\n" +
+                        "<OutputPath>Temp</OutputPath>\n" +
+                        "<AllowUnsafeBlocks>{1}</AllowUnsafeBlocks>\n" +
+                        "<AssemblySearchPaths>{2}</AssemblySearchPaths>\n" +
+                        "<DefineConstants>{3}</DefineConstants>\n" +
+                    "</PropertyGroup>\n";
+        FixedString32Bytes unsafeStr = unsafeCode ? "true" : "false";
+        output.AppendFormat(propertyGroupFormatString, langVersion, unsafeStr, assemblySearchPaths, defines);
 
         //compile and reference belong in an itemgroup
+        FixedString64Bytes itemGroupFormatString = "<ItemGroup>\n{0}\n{1}\n</ItemGroup>\n";
         output.AppendFormat(itemGroupFormatString, compileItemsXml, referenceItems);
-
-
 
         //There can be projects without any project references. Don't write anything in that case.
         if (projectReferences.Length > 0)

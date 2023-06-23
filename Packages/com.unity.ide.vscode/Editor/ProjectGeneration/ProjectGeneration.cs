@@ -281,13 +281,13 @@ namespace VSCodeEditor
 
         public void Sync()
         {
-            // using (s_syncMarker.Auto())
-            // {
-            //     SetupProjectSupportedExtensions();
-            //     GenerateAndWriteSolutionAndProjects();
+            using (s_syncMarker.Auto())
+            {
+                SetupProjectSupportedExtensions();
+                GenerateAndWriteSolutionAndProjects();
 
-            //     OnGeneratedCSProjectFiles();
-            // }
+                // OnGeneratedCSProjectFiles();
+            }
 
             using (s_jobifiedSyncMarker.Auto())
             {
@@ -345,28 +345,10 @@ namespace VSCodeEditor
             string[] systemReferenceDirs;
 
             //These are always the same, so don't need to be inside the loop
-            FixedString64Bytes compileFormatString = new("<Compile Include=\"{0}\" />\n");
-            FixedString64Bytes referenceFormatString = new("<Reference Include=\"{0}\" />\n");
-            FixedString64Bytes itemGroupFormatString = new("<ItemGroup>\n{0}\n{1}\n</ItemGroup>\n");
             FixedString64Bytes projectElement = new("<Project Sdk=\"Microsoft.NET.Sdk\">\n");
             FixedString32Bytes projectEndElement = new("</Project>\n");
             FixedString32Bytes itemGroupElement = new("<ItemGroup>\n");
             FixedString32Bytes itemGroupEndElement = new("</ItemGroup>\n");
-            FixedString32Bytes trueStr = new("true");
-            FixedString32Bytes falseStr = new("false");
-            FixedString4096Bytes propertyGroupFormatString =
-                new("<PropertyGroup>\n" +
-                        "<TargetFramework>netstandard2.1</TargetFramework>\n" + //make this configurable as well
-                        "<LangVersion>{0}</LangVersion>\n" +
-                        "<EnableDefaultItems>false</EnableDefaultItems>\n" +
-                        "<DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>\n" +
-                        "<GenerateAssemblyInfo>false</GenerateAssemblyInfo>\n" +
-                        "<Deterministic>true</Deterministic>\n" +
-                        "<OutputPath>Temp</OutputPath>\n" +
-                        "<AllowUnsafeBlocks>{1}</AllowUnsafeBlocks>\n" +
-                        "<AssemblySearchPaths>{2}</AssemblySearchPaths>\n" +
-                        "<DefineConstants>{3}</DefineConstants>\n" +
-                    "</PropertyGroup>\n");
 
             //It'd be nicer if this was NativeArray but it doesn't like tuples :(
             List<(JobHandle, GenerateProjectJob)> jobList = new(assemblies.Length);
@@ -414,10 +396,7 @@ namespace VSCodeEditor
                 bool unsafeCode = assembly.compilerOptions.AllowUnsafeCode;
 
                 //so it turns out that NativeText is a container and it can't be in NativeArrays...
-                //well, then let's do one level of NativeText with internal separator chars.
-                //defines and search paths by ';', source files by ':'
                 NativeText defines = new(4096, Allocator.TempJob);
-                // NativeText sourceFiles = new(8192, Allocator.TempJob);
                 NativeList<UnsafeList<char>> sourceFilesUtf16 = new(8192, Allocator.TempJob);
                 NativeText searchPaths = new(8192, Allocator.TempJob);
                 NativeArray<FixedString4096Bytes> refs = new(csRefs.Length, Allocator.TempJob);
@@ -450,9 +429,7 @@ namespace VSCodeEditor
                 }
 
                 searchPaths.Append(scriptAssembliesPath);
-                searchPaths.Append(';');
-
-                //Add this to the end
+                searchPaths.Add((byte)';');
                 searchPaths.Append("$(AssemblySearchPaths)");
 
                 foreach (string filePath in csSourceFiles)
@@ -499,13 +476,9 @@ namespace VSCodeEditor
                     defines = defines,
                     utf16Files = sourceFilesUtf16,
                     output = projectTextOutput,
-                    compileFormatString = compileFormatString,
-                    referenceFormatString = referenceFormatString,
                     assemblySearchPaths = searchPaths,
-                    itemGroupFormatString = itemGroupFormatString,
-                    propertyGroupFormatString = propertyGroupFormatString,
                     langVersion = new(langVersion),
-                    unsafeCode = unsafeCode ? trueStr : falseStr,
+                    unsafeCode = unsafeCode,
                     projectReferences = projectRefs,
                     projectElement = projectElement,
                     projectEndElement = projectEndElement,
