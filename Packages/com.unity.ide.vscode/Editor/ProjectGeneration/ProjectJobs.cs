@@ -240,8 +240,8 @@ struct GenerateSlnJob : IJob
 
         //indent with tabs
         output.Add((byte)'\t');
-        FixedString64Bytes globalSection1 = "GlobalSection(SolutionConfigurationPlatforms) = preSolution\n";
-        output.Append(globalSection1);
+        FixedString64Bytes globalSectionPre = "GlobalSection(SolutionConfigurationPlatforms) = preSolution\n";
+        output.Append(globalSectionPre);
 
         output.Add((byte)'\t');
         output.Add((byte)'\t');
@@ -253,12 +253,28 @@ struct GenerateSlnJob : IJob
         output.Append(endGlobalSection);
 
         output.Add((byte)'\t');
-        FixedString64Bytes globalSection2 = "GlobalSection(ProjectConfigurationPlatforms) = postSolution\n";
-        output.Append(globalSection2);
+        FixedString64Bytes globalSectionPost = "GlobalSection(ProjectConfigurationPlatforms) = postSolution\n";
+        output.Append(globalSectionPost);
 
-        //TODO: write all the projects with their guids and configs here
-        // output.Add((byte)'\t');
-        // output.Add((byte)'\t');
+        FixedString64Bytes cfgLineFormat = "{0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU\n";
+        FixedString64Bytes buildLineFormat = "{0}.Debug|Any CPU.Build.0 = Debug|Any CPU\n";
+
+        for (int i = 0; i < projectsInSln.Length; i++)
+        {
+            //There is a bug with nested braces and AppendFormat, so we do this manually (sigh).
+            FixedString64Bytes guid = new();
+            guid.Add((byte)'{');
+            guid.Append(projectsInSln[i].guid);
+            guid.Add((byte)'}');
+
+            output.Add((byte)'\t');
+            output.Add((byte)'\t');
+            output.AppendFormat(cfgLineFormat, guid);
+
+            output.Add((byte)'\t');
+            output.Add((byte)'\t');
+            output.AppendFormat(buildLineFormat, guid);
+        }
 
         output.Add((byte)'\t');
         output.Append(endGlobalSection);
