@@ -205,17 +205,9 @@ struct WriteToFileJob : IJob
     }
 }
 
+[BurstCompile]
 struct GenerateSlnJob : IJob
 {
-    //Microsoft Visual Studio Solution File, Format Version 12.00
-    [ReadOnly] public FixedString512Bytes slnHeader;
-
-    //Format for a single C# project looks like this:
-    //Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "{0}", "{0}.csproj", "{1}"
-    //EndProject
-    //with {0} being the project name and {1} being the project GUID
-    [ReadOnly] public FixedString4096Bytes projectFormatString;
-
     //maybe rename projectreference to something that fits both cases
     [ReadOnly] public NativeList<ProjectReference> projectsInSln;
 
@@ -223,23 +215,58 @@ struct GenerateSlnJob : IJob
 
     public void Execute()
     {
+        FixedString512Bytes slnHeader = "Microsoft Visual Studio Solution File, Format Version 12.00";
+        FixedString4096Bytes projectFormatString = "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") " +
+            "= \"{0}\", \"{0}.csproj\", \"{1}\"\nEndProject\n";
+
         output.Append(slnHeader);
         output.Add((byte)'\n');
 
         for (int i = 0; i < projectsInSln.Length; i++)
         {
             var projData = projectsInSln[i];
-            output.AppendFormat(projectFormatString, projData.name, projData.guid);
+
+            //There is a bug with nested braces and AppendFormat, so we do this manually.
+            FixedString64Bytes guidWithBraces = new();
+            guidWithBraces.Add((byte)'{');
+            guidWithBraces.Append(projData.guid);
+            guidWithBraces.Add((byte)'}');
+
+            output.AppendFormat(projectFormatString, projData.name, guidWithBraces);
         }
 
-        //TODO: see if we can get away with not writing a global section
-        //and add it if needed.
-        //We need a global section, otherwise dotnet build doesn't know what to do
+        FixedString32Bytes global = "Global\n";
+        output.Append(global);
+
+        //indent with tabs
+        output.Add((byte)'\t');
+        FixedString64Bytes globalSection1 = "GlobalSection(SolutionConfigurationPlatforms) = preSolution\n";
+        output.Append(globalSection1);
+
+        output.Add((byte)'\t');
+        output.Add((byte)'\t');
+        FixedString64Bytes debugAnyCpu = "Debug|Any CPU = Debug|Any CPU\n";
+        output.Append(debugAnyCpu);
+
+        output.Add((byte)'\t');
+        FixedString32Bytes endGlobalSection = "EndGlobalSection\n";
+        output.Append(endGlobalSection);
+
+        output.Add((byte)'\t');
+        FixedString64Bytes globalSection2 = "GlobalSection(ProjectConfigurationPlatforms) = postSolution\n";
+        output.Append(globalSection2);
+
+        //TODO: write all the projects with their guids and configs here
+        // output.Add((byte)'\t');
+        // output.Add((byte)'\t');
+
+        output.Add((byte)'\t');
+        output.Append(endGlobalSection);
 
         //We need a block like this:
         //GlobalSection(SolutionConfigurationPlatforms) = preSolution
         // 	Debug|Any CPU = Debug|Any CPU
-        // EndGlobalSection
+        //EndGlobalSection
 
         //and another one like this:
         //GlobalSection(ProjectConfigurationPlatforms) = postSolution
@@ -251,6 +278,9 @@ struct GenerateSlnJob : IJob
         // 	{0af454fe-e3d5-234b-8e33-50684044af23}.Debug|Any CPU.Build.0 = Debug|Any CPU
         // ...
         // EndGlobalSection
+
+        FixedString32Bytes endGlobal = "EndGlobal\n";
+        output.Append(endGlobal);
     }
 }
 
