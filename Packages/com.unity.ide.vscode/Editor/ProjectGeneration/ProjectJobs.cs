@@ -5,15 +5,6 @@ using System.IO;
 using System;
 using Unity.Collections.LowLevel.Unsafe;
 
-struct ProjectReferenceStrings
-{
-    public FixedString64Bytes projectReferenceStart;
-    public FixedString32Bytes projectReferenceEnd;
-    public FixedString32Bytes projectFormatString;
-    public FixedString32Bytes nameFormatString;
-    // public FixedString64Bytes guidFormatString;
-}
-
 struct ProjectReference
 {
     public FixedString4096Bytes name;
@@ -51,7 +42,6 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public FixedString64Bytes projectEndElement;
     [ReadOnly] public FixedString32Bytes itemGroupElement;
     [ReadOnly] public FixedString32Bytes itemGroupEndElement;
-    [ReadOnly] public ProjectReferenceStrings projectReferenceStrings;
 
     public NativeText output;
 
@@ -100,13 +90,18 @@ struct GenerateProjectJob : IJob
             referenceItems.AppendFormat(referenceFormatString, assemblyReferences[i]);
         }
 
-        //project references in their own itemgroup
-        NativeText projectRefs = new(Allocator.Temp);
-
+        //Project references are in their own ItemGroup.
         // <ProjectReference Include="Assembly-CSharp.csproj">
         //   <Project>{29b64283-c21a-f655-ab7b-f58eb1e6716a}</Project>
         //   <Name>Assembly-CSharp</Name>
         // </ProjectReference>
+        NativeText projectRefs = new(Allocator.Temp);
+
+        FixedString64Bytes projectReferenceStart = "<ProjectReference Include=\"{0}.csproj\">";
+        FixedString32Bytes projectReferenceEnd = "</ProjectReference>";
+        FixedString32Bytes projectFormatString = "<Project>{0}</Project>";
+        FixedString32Bytes nameFormatString = "<Name>{0}</Name>";
+
         for (int i = 0; i < projectReferences.Length; i++)
         {
             ProjectReference projectRef = projectReferences[i];
@@ -119,7 +114,7 @@ struct GenerateProjectJob : IJob
             }
 
             var projectRefName = projectRef.name;
-            projectRefs.AppendFormat(projectReferenceStrings.projectReferenceStart, projectRefName);
+            projectRefs.AppendFormat(projectReferenceStart, projectRefName);
 
             //TODO: generate guid for name
             //in unity's code this is done via MD5 class, but we can't use it with burst...
@@ -155,10 +150,10 @@ struct GenerateProjectJob : IJob
             guidString.Add((byte)'{');
             guidString.Append(projectRef.guid);
             guidString.Add((byte)'}');
-            projectRefs.AppendFormat(projectReferenceStrings.projectFormatString, guidString);
+            projectRefs.AppendFormat(projectFormatString, guidString);
 
-            projectRefs.AppendFormat(projectReferenceStrings.nameFormatString, projectRefName);
-            projectRefs.Append(projectReferenceStrings.projectReferenceEnd);
+            projectRefs.AppendFormat(nameFormatString, projectRefName);
+            projectRefs.Append(projectReferenceEnd);
             projectRefs.Add((byte)'\n');
         }
 

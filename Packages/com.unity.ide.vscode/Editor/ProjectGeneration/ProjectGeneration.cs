@@ -351,7 +351,10 @@ namespace VSCodeEditor
             FixedString32Bytes itemGroupEndElement = new("</ItemGroup>\n");
 
             //It'd be nicer if this was NativeArray but it doesn't like tuples :(
+            //So this sucks a bunch because of managed allocations, but we can't put GenerateProjectJob
+            //in a NativeArray because it contains NativeArrays itself...
             List<(JobHandle, GenerateProjectJob)> jobList = new(assemblies.Length);
+
             NativeList<ProjectReference> projectsInSln = new(64, Allocator.TempJob);
 
             for (int i = 0; i < assemblies.Length; i++)
@@ -485,14 +488,6 @@ namespace VSCodeEditor
                     itemGroupElement = itemGroupElement,
                     itemGroupEndElement = itemGroupEndElement,
                     excludedAssemblies = excludedAssemblies,
-                    projectReferenceStrings = new()
-                    {
-                        nameFormatString = new("<Name>{0}</Name>"),
-                        projectFormatString = new("<Project>{0}</Project>"),
-                        projectReferenceStart = new("<ProjectReference Include=\"{0}.csproj\">"),
-                        projectReferenceEnd = new("</ProjectReference>"),
-                        // guidFormatString = new("{0}-{1}-{2}-{3}-{4}"),
-                    }
                 };
 
                 WriteToFileJob writeJob = new()
