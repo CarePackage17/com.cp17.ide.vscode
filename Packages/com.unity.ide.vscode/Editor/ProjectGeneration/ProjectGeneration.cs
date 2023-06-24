@@ -441,6 +441,10 @@ namespace VSCodeEditor
                     //try this: https://docs.unity3d.com/Manual/upm-assets.html
                     //It does get absolute paths (Unity uses MonoIO to remap), we need relative to project dir (and old code does that)
                     string absolutePath = Path.GetFullPath(filePath);
+
+                    //It turns out this takes entirely too much time. See if we can get rid of it or at least move to a managed
+                    //job so it doesn't stall the main thread as much.
+                    //Same goes for GetFullPath and GetFileName/GetDirectoryName
                     string relativeToProject = Path.GetRelativePath(ProjectDirectory, absolutePath);
 
                     //The job should dispose this after conversion
