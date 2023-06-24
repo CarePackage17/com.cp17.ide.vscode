@@ -35,14 +35,6 @@ struct GenerateProjectJob : IJob
     //excluded from project generation
     [ReadOnly] public NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies;
 
-    //These little strings are kinda ugly, but even though burst docs say they support
-    //initializing those from string literals, that doesn't seem to be the case here.
-    //Maybe collections 2.0 only? Anyway, that's not in scope for 2021 LTS.
-    [ReadOnly] public FixedString64Bytes projectElement;
-    [ReadOnly] public FixedString64Bytes projectEndElement;
-    [ReadOnly] public FixedString32Bytes itemGroupElement;
-    [ReadOnly] public FixedString32Bytes itemGroupEndElement;
-
     public NativeText output;
 
     public void Execute()
@@ -158,7 +150,7 @@ struct GenerateProjectJob : IJob
         }
 
         //concat all into output
-        // FixedString64Bytes projectElement = "<Project Sdk=\"Microsoft.NET.Sdk\">\n";
+        FixedString64Bytes projectElement = "<Project Sdk=\"Microsoft.NET.Sdk\">\n";
         output.Append(projectElement);
 
         FixedString4096Bytes propertyGroupFormatString = "<PropertyGroup>\n" +
@@ -180,6 +172,8 @@ struct GenerateProjectJob : IJob
         FixedString64Bytes itemGroupFormatString = "<ItemGroup>\n{0}\n{1}\n</ItemGroup>\n";
         output.AppendFormat(itemGroupFormatString, compileItemsXml, referenceItems);
 
+        FixedString32Bytes itemGroupElement = "<ItemGroup>\n";
+        FixedString32Bytes itemGroupEndElement = "</ItemGroup>\n";
         //There can be projects without any project references. Don't write anything in that case.
         if (projectReferences.Length > 0)
         {
@@ -188,6 +182,7 @@ struct GenerateProjectJob : IJob
             output.Append(itemGroupEndElement);
         }
 
+        FixedString32Bytes projectEndElement = "</Project>\n";
         output.Append(projectEndElement);
     }
 }

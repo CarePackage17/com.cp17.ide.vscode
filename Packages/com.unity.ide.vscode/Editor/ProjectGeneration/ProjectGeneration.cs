@@ -344,13 +344,6 @@ namespace VSCodeEditor
             string scriptAssembliesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies"));
             string[] systemReferenceDirs;
 
-            //These are always the same, so don't need to be inside the loop
-            FixedString64Bytes projectElement = new("<Project Sdk=\"Microsoft.NET.Sdk\">\n");
-            FixedString32Bytes projectEndElement = new("</Project>\n");
-            FixedString32Bytes itemGroupElement = new("<ItemGroup>\n");
-            FixedString32Bytes itemGroupEndElement = new("</ItemGroup>\n");
-
-            //It'd be nicer if this was NativeArray but it doesn't like tuples :(
             //So this sucks a bunch because of managed allocations, but we can't put GenerateProjectJob
             //in a NativeArray because it contains NativeArrays itself...
             List<(JobHandle, GenerateProjectJob)> jobList = new(assemblies.Length);
@@ -375,8 +368,8 @@ namespace VSCodeEditor
                 FixedString4096Bytes assemblyName = new(assembly.name);
                 projectsInSln.Add(new(assemblyName, new FixedString64Bytes(projectGuid)));
 
-                //this can be moved out of the loop and preallocated for the most common api levels
-                //(netstandard and unity4_8) so we generate less garbage
+                //We cache this for the most common api levels (netstandard and unity4_8) so we generate garbage
+                //only once (per domain reload).
                 if (apiCompatLevel == ApiCompatibilityLevel.NET_Standard)
                 {
                     systemReferenceDirs = s_netStandardAssemblyDirectories;
@@ -487,10 +480,6 @@ namespace VSCodeEditor
                     langVersion = new(langVersion),
                     unsafeCode = unsafeCode,
                     projectReferences = projectRefs,
-                    projectElement = projectElement,
-                    projectEndElement = projectEndElement,
-                    itemGroupElement = itemGroupElement,
-                    itemGroupEndElement = itemGroupEndElement,
                     excludedAssemblies = excludedAssemblies,
                 };
 
@@ -502,6 +491,16 @@ namespace VSCodeEditor
 
                 var projHandle = generateJob.Schedule();
                 var handle = writeJob.Schedule(projHandle);
+
+                //cleanup jobs after everything is done
+                // NativeArray<JobHandle> cleanupJobs = new(6, Allocator.Temp);
+                // cleanupJobs[0] = refs.Dispose(projHandle);
+                // cleanupJobs[1] = defines.Dispose(projHandle);
+                // cleanupJobs[2] = sourceFilesUtf16.Dispose(projHandle);
+                // cleanupJobs[3] = searchPaths.Dispose(projHandle);
+                // cleanupJobs[4] = projectRefs.Dispose(projHandle);
+                // cleanupJobs[5] = projectTextOutput.Dispose(handle);
+                // JobHandle cleanupHandle = JobHandle.CombineDependencies(cleanupJobs);
 
                 jobList.Add((handle, generateJob));
 
