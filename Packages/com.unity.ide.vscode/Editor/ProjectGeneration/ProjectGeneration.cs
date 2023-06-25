@@ -34,6 +34,8 @@ namespace VSCodeEditor
         static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
         static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
         static ProfilerMarker s_excludedAssemblyMarker = new("GetExcludedAssemblies");
+        static ProfilerMarker s_mainAssemblyGenMarker = new("MainAssemblyGeneration");
+        static ProfilerMarker s_slnGenMarker = new("SlnGeneration");
 
         //These don't change at runtime, so we can cache them once and use them forever.
         static string[] s_netStandardAssemblyDirectories = CompilationPipeline.GetSystemAssemblyDirectories(ApiCompatibilityLevel.NET_Standard);
@@ -349,8 +351,10 @@ namespace VSCodeEditor
             List<(JobHandle, GenerateProjectJob)> jobList = new(assemblies.Length);
 
             NativeList<ProjectReference> projectsInSln = new(64, Allocator.TempJob);
-            StringBuilder sb = new();
+            StringBuilder sb = new(capacity: 4096);
             sb.AppendLine("Excluded assembles:");
+
+            s_mainAssemblyGenMarker.Begin();
 
             for (int i = 0; i < assemblies.Length; i++)
             {
@@ -367,24 +371,9 @@ namespace VSCodeEditor
                 ApiCompatibilityLevel apiCompatLevel = assembly.compilerOptions.ApiCompatibilityLevel;
                 string projectGuid = ProjectGuid(assembly.name);
 
-                FixedString4096Bytes assemblyName = new(assembly.name);
-                projectsInSln.Add(new(assemblyName, new FixedString64Bytes(projectGuid)));
-
-                //We cache this for the most common api levels (netstandard and unity4_8) so we generate garbage
-                //only once (per domain reload).
-                if (apiCompatLevel == ApiCompatibilityLevel.NET_Standard)
-                {
-                    systemReferenceDirs = s_netStandardAssemblyDirectories;
-                }
-                else if (apiCompatLevel == ApiCompatibilityLevel.NET_Unity_4_8)
-                {
-                    systemReferenceDirs = s_net48AssemblyDirectories;
-                }
-                else
-                {
-                    //slow path, shouldn't really end up here
-                    systemReferenceDirs = CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
-                }
+                FixedString4096Bytes assemblyNameUtf8 = new(assembly.name);
+                projectsInSln.Add(new(assemblyNameUtf8, new FixedString64Bytes(projectGuid)));
+                systemReferenceDirs = GetSystemAssemblyDirectories(apiCompatLevel);
 
                 string[] csDefines = assembly.defines;
                 string[] csSourceFiles = assembly.sourceFiles;
@@ -581,6 +570,8 @@ namespace VSCodeEditor
                 }
             }
 
+            s_mainAssemblyGenMarker.End();
+
             //complete all the jobs
             //dispose all the things
             foreach ((JobHandle handle, var jobData) in jobList)
@@ -598,9 +589,30 @@ namespace VSCodeEditor
 
             Debug.Log(sb.ToString());
 
+            s_slnGenMarker.Begin();
             JobifiedCreateSln(projectsInSln);
+            s_slnGenMarker.End();
 
             excludedAssemblies.Dispose();
+        }
+
+        static string[] GetSystemAssemblyDirectories(ApiCompatibilityLevel apiCompatLevel)
+        {
+            //We cache this for the most common api levels (netstandard and unity4_8) so we generate garbage
+            //only once (per domain reload).
+            if (apiCompatLevel == ApiCompatibilityLevel.NET_Standard)
+            {
+                return s_netStandardAssemblyDirectories;
+            }
+            else if (apiCompatLevel == ApiCompatibilityLevel.NET_Unity_4_8)
+            {
+                return s_net48AssemblyDirectories;
+            }
+            else
+            {
+                //slow path, shouldn't really end up here
+                return CompilationPipeline.GetSystemAssemblyDirectories(apiCompatLevel);
+            }
         }
 
         public bool SolutionExists()

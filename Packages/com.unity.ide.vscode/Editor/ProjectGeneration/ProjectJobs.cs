@@ -71,7 +71,8 @@ struct GenerateProjectJob : IJob
 
         //From the assembly reference paths we pass in we can make an array of assembly references +
         //assembly search paths.
-        NativeText pathUtf8 = new(4096, Allocator.Temp);
+        NativeList<FixedString4096Bytes> assemblyReferenceNames = new(assemblyReferencePathsUtf16.Length, Allocator.Temp);
+        FixedString4096Bytes pathUtf8 = new();
         for (int i = 0; i < assemblyReferencePathsUtf16.Length; i++)
         {
             pathUtf8.Clear();
@@ -81,6 +82,14 @@ struct GenerateProjectJob : IJob
                 byte* destPtr = pathUtf8.GetUnsafePtr();
                 UTF8ArrayUnsafeUtility.Copy(destPtr, out int _, pathUtf8.Length, pathUtf16.Ptr, pathUtf16.Length);
             }
+
+            assemblyReferenceNames.Add(pathUtf8);
+
+            //TODO:
+            //- Get filename without extension from full path
+            //  - If we get only .dll paths, then we can skip a bunch of work
+            //- Get path to file without filename, add to search paths hashset
+            //- Add these two things into their collections
         }
 
         //Preprocessor defines look like this in the project file:
