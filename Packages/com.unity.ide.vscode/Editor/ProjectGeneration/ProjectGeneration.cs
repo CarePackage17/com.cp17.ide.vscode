@@ -349,13 +349,15 @@ namespace VSCodeEditor
             List<(JobHandle, GenerateProjectJob)> jobList = new(assemblies.Length);
 
             NativeList<ProjectReference> projectsInSln = new(64, Allocator.TempJob);
+            StringBuilder sb = new();
+            sb.AppendLine("Excluded assembles:");
 
             for (int i = 0; i < assemblies.Length; i++)
             {
                 Assembly assembly = assemblies[i];
                 if (excludedAssemblies.Contains(new(assembly.name)))
                 {
-                    Debug.Log($"{assembly.name} should be excluded");
+                    sb.AppendLine(assembly.name);
                     continue;
                 }
 
@@ -394,10 +396,10 @@ namespace VSCodeEditor
                 //so it turns out that NativeText is a container and it can't be in NativeArrays...
                 NativeText defines = new(4096, Allocator.TempJob);
                 NativeList<UnsafeList<char>> sourceFilesUtf16 = new(8192, Allocator.TempJob);
-                NativeText searchPaths = new(8192, Allocator.TempJob);
-                NativeArray<FixedString4096Bytes> refs = new(csRefs.Length, Allocator.TempJob);
-                NativeArray<ProjectReference> projectRefs = new(maybeAsmdefReferences.Length, Allocator.TempJob);
-                NativeText projectTextOutput = new(32 * 1024, Allocator.TempJob);
+                NativeText assemblySearchPaths = new(8192, Allocator.TempJob);
+                NativeArray<FixedString4096Bytes> assemblyReferences = new(csRefs.Length, Allocator.TempJob);
+                NativeArray<ProjectReference> projectReferences = new(maybeAsmdefReferences.Length, Allocator.TempJob);
+                NativeText projectXmlOutput = new(32 * 1024, Allocator.TempJob);
                 NativeList<int> searchPathHashes = new(64, Allocator.Temp);
 
                 int refIndex = 0;
@@ -415,18 +417,18 @@ namespace VSCodeEditor
                     if (!searchPathHashes.Contains(hash))
                     {
                         searchPathHashes.Add(hash);
-                        searchPaths.Append(searchPath);
-                        searchPaths.Append(';');
+                        assemblySearchPaths.Append(searchPath);
+                        assemblySearchPaths.Append(';');
                     }
 
                     //come on, why can't we init a fixedstring from span :(
-                    refs[refIndex] = new(refFileName.ToString());
+                    assemblyReferences[refIndex] = new(refFileName.ToString());
                     refIndex++;
                 }
 
-                searchPaths.Append(scriptAssembliesPath);
-                searchPaths.Add((byte)';');
-                searchPaths.Append("$(AssemblySearchPaths)");
+                assemblySearchPaths.Append(scriptAssembliesPath);
+                assemblySearchPaths.Add((byte)';');
+                assemblySearchPaths.Append("$(AssemblySearchPaths)");
 
                 foreach (string filePath in csSourceFiles)
                 {
@@ -465,40 +467,41 @@ namespace VSCodeEditor
                 int refIndex2 = 0;
                 foreach (Assembly a in maybeAsmdefReferences)
                 {
-                    projectRefs[refIndex2] = new(a.name, ProjectGuid(a.name));
+                    projectReferences[refIndex2] = new(a.name, ProjectGuid(a.name));
                     refIndex2++;
                 }
 
                 GenerateProjectJob generateJob = new()
                 {
                     assemblyName = new(assembly.name),
-                    assemblyReferences = refs,
+                    assemblyReferences = assemblyReferences,
                     defines = defines,
                     utf16Files = sourceFilesUtf16,
-                    output = projectTextOutput,
-                    assemblySearchPaths = searchPaths,
+                    projectXmlOutput = projectXmlOutput,
+                    assemblySearchPaths = assemblySearchPaths,
                     langVersion = new(langVersion),
                     unsafeCode = unsafeCode,
-                    projectReferences = projectRefs,
+                    projectReferences = projectReferences,
                     excludedAssemblies = excludedAssemblies,
                 };
 
                 WriteToFileJob writeJob = new()
                 {
-                    content = projectTextOutput,
+                    content = projectXmlOutput,
                     filePath = new FixedString4096Bytes(Path.Combine(ProjectDirectory, $"{assembly.name}.csproj"))
                 };
 
                 var projHandle = generateJob.Schedule();
                 var handle = writeJob.Schedule(projHandle);
 
-                //cleanup jobs after everything is done
+                //Unfortunately, Dispose(JobHandle) seems to be broken for NativeText :(
+                //Let's see if Unity fixes it.
                 // NativeArray<JobHandle> cleanupJobs = new(6, Allocator.Temp);
-                // cleanupJobs[0] = refs.Dispose(projHandle);
-                // cleanupJobs[1] = defines.Dispose(projHandle);
+                // cleanupJobs[0] = assemblyReferences.Dispose(handle);
+                // cleanupJobs[1] = defines.Dispose(handle);
                 // cleanupJobs[2] = sourceFilesUtf16.Dispose(projHandle);
                 // cleanupJobs[3] = searchPaths.Dispose(projHandle);
-                // cleanupJobs[4] = projectRefs.Dispose(projHandle);
+                // cleanupJobs[4] = projectReferences.Dispose(handle);
                 // cleanupJobs[5] = projectTextOutput.Dispose(handle);
                 // JobHandle cleanupHandle = JobHandle.CombineDependencies(cleanupJobs);
 
@@ -571,8 +574,10 @@ namespace VSCodeEditor
                 jobData.assemblySearchPaths.Dispose();
                 jobData.assemblyReferences.Dispose();
                 jobData.projectReferences.Dispose();
-                jobData.output.Dispose();
+                jobData.projectXmlOutput.Dispose();
             }
+
+            Debug.Log(sb.ToString());
 
             JobifiedCreateSln(projectsInSln);
 

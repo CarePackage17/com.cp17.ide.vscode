@@ -35,7 +35,7 @@ struct GenerateProjectJob : IJob
     //excluded from project generation
     [ReadOnly] public NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies;
 
-    public NativeText output;
+    public NativeText projectXmlOutput;
 
     public void Execute()
     {
@@ -151,7 +151,7 @@ struct GenerateProjectJob : IJob
 
         //concat all into output
         FixedString64Bytes projectElement = "<Project Sdk=\"Microsoft.NET.Sdk\">\n";
-        output.Append(projectElement);
+        projectXmlOutput.Append(projectElement);
 
         FixedString4096Bytes propertyGroupFormatString = "<PropertyGroup>\n" +
                         "<TargetFramework>netstandard2.1</TargetFramework>\n" + //make this configurable as well
@@ -166,24 +166,24 @@ struct GenerateProjectJob : IJob
                         "<DefineConstants>{3}</DefineConstants>\n" +
                     "</PropertyGroup>\n";
         FixedString32Bytes unsafeStr = unsafeCode ? "true" : "false";
-        output.AppendFormat(propertyGroupFormatString, langVersion, unsafeStr, assemblySearchPaths, defines);
+        projectXmlOutput.AppendFormat(propertyGroupFormatString, langVersion, unsafeStr, assemblySearchPaths, defines);
 
         //compile and reference belong in an itemgroup
         FixedString64Bytes itemGroupFormatString = "<ItemGroup>\n{0}\n{1}\n</ItemGroup>\n";
-        output.AppendFormat(itemGroupFormatString, compileItemsXml, referenceItems);
+        projectXmlOutput.AppendFormat(itemGroupFormatString, compileItemsXml, referenceItems);
 
         FixedString32Bytes itemGroupElement = "<ItemGroup>\n";
         FixedString32Bytes itemGroupEndElement = "</ItemGroup>\n";
         //There can be projects without any project references. Don't write anything in that case.
         if (projectReferences.Length > 0)
         {
-            output.Append(itemGroupElement);
-            output.Append(projectRefs);
-            output.Append(itemGroupEndElement);
+            projectXmlOutput.Append(itemGroupElement);
+            projectXmlOutput.Append(projectRefs);
+            projectXmlOutput.Append(itemGroupEndElement);
         }
 
         FixedString32Bytes projectEndElement = "</Project>\n";
-        output.Append(projectEndElement);
+        projectXmlOutput.Append(projectEndElement);
     }
 }
 
