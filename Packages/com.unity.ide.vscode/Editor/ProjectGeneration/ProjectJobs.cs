@@ -27,7 +27,8 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public FixedString64Bytes langVersion;
     [ReadOnly] public bool unsafeCode;
     [ReadOnly] public NativeList<UnsafeList<char>> definesUtf16;
-    [ReadOnly] public NativeList<UnsafeList<char>> utf16Files;
+    [ReadOnly] public NativeList<UnsafeList<char>> sourceFilesUtf16;
+    [ReadOnly] public NativeList<UnsafeList<char>> assemblyReferencePathsUtf16;
     [ReadOnly] public NativeText assemblySearchPaths;
     [ReadOnly] public NativeArray<FixedString4096Bytes> assemblyReferences;
     [ReadOnly] public NativeArray<ProjectReference> projectReferences;
@@ -39,7 +40,6 @@ struct GenerateProjectJob : IJob
     public void Execute()
     {
         NativeText compileItemsXml = new(Allocator.Temp);
-
         FixedString32Bytes compileFormatString = "<Compile Include=\"{0}\" />\n";
 
         //write all cs files into <Compile /> items, like this:
@@ -47,10 +47,10 @@ struct GenerateProjectJob : IJob
         //<Compile Include="Packages/com.unity.ide.vscode/Editor/ProjectGeneration/FileIO.cs" />
         //...
         NativeText sourceFileTextUtf8 = new(4096, Allocator.Temp);
-        for (int i = 0; i < utf16Files.Length; i++)
+        for (int i = 0; i < sourceFilesUtf16.Length; i++)
         {
             sourceFileTextUtf8.Clear();
-            UnsafeList<char> filePathUtf16 = utf16Files[i];
+            using UnsafeList<char> filePathUtf16 = sourceFilesUtf16[i];
             unsafe
             {
                 byte* destPtr = sourceFileTextUtf8.GetUnsafePtr();
@@ -66,10 +66,21 @@ struct GenerateProjectJob : IJob
                 }
             }
 
-            //Don't forget to dispose!
-            filePathUtf16.Dispose();
-
             compileItemsXml.AppendFormat(compileFormatString, sourceFileTextUtf8);
+        }
+
+        //From the assembly reference paths we pass in we can make an array of assembly references +
+        //assembly search paths.
+        NativeText pathUtf8 = new(4096, Allocator.Temp);
+        for (int i = 0; i < assemblyReferencePathsUtf16.Length; i++)
+        {
+            pathUtf8.Clear();
+            using UnsafeList<char> pathUtf16 = assemblyReferencePathsUtf16[i];
+            unsafe
+            {
+                byte* destPtr = pathUtf8.GetUnsafePtr();
+                UTF8ArrayUnsafeUtility.Copy(destPtr, out int _, pathUtf8.Length, pathUtf16.Ptr, pathUtf16.Length);
+            }
         }
 
         //Preprocessor defines look like this in the project file:
@@ -96,7 +107,6 @@ struct GenerateProjectJob : IJob
             defines.Add((byte)';');
         }
 
-        //write all refs into <Include /> items
         NativeText referenceItems = new(Allocator.Temp);
         FixedString32Bytes referenceFormatString = "<Reference Include=\"{0}\" />\n";
 
@@ -207,6 +217,28 @@ struct GenerateProjectJob : IJob
 
         FixedString32Bytes projectEndElement = "</Project>\n";
         projectXmlOutput.Append(projectEndElement);
+    }
+}
+
+//TODO: Copy whatever Mono does for path manipulation and make it work with unity native strings instead.
+static class Temp
+{
+    //Copied from Mono in Unity 2021.3:
+    //https://github.com/Unity-Technologies/mono/blob/d20b7310dcfd02edb5c6963b218a8405b92702d7/mcs/class/corlib/System.IO/Path.cs#L626
+    static char[] PathSeparatorChars = new[] { Path.PathSeparator, Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
+    static int findExtension(string path)
+    {
+        // method should return the index of the path extension
+        // start or -1 if no valid extension
+        if (path != null)
+        {
+            int iLastDot = path.LastIndexOf('.');
+            int iLastSep = path.LastIndexOfAny(PathSeparatorChars);
+
+            if (iLastDot > iLastSep)
+                return iLastDot;
+        }
+        return -1;
     }
 }
 

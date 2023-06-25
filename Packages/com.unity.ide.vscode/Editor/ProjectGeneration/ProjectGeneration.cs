@@ -33,6 +33,7 @@ namespace VSCodeEditor
         static ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
         static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
         static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
+        static ProfilerMarker s_excludedAssemblyMarker = new("GetExcludedAssemblies");
 
         //These don't change at runtime, so we can cache them once and use them forever.
         static string[] s_netStandardAssemblyDirectories = CompilationPipeline.GetSystemAssemblyDirectories(ApiCompatibilityLevel.NET_Standard);
@@ -295,8 +296,6 @@ namespace VSCodeEditor
             }
         }
 
-        static ProfilerMarker s_excludedAssemblyMarker = new("GetExcludedAssemblies");
-
         void JobifiedSync()
         {
             Debug.Log($"Running {nameof(JobifiedSync)}");
@@ -306,8 +305,7 @@ namespace VSCodeEditor
             //here's how rider does it:
             //https://github.com/needle-mirror/com.unity.ide.rider/blob/master/Rider/Editor/ProjectGeneration/AssemblyNameProvider.cs#L56
 
-            //This generates a lot of garbage, but we can't avoid it.
-            //It's the only way to get this data as of 2021 LTS.
+            //This generates a lot of garbage, but it's the only way to get this data as of 2021 LTS.
             Assembly[] assemblies = CompilationPipeline.GetAssemblies(assembliesType);
 
             s_excludedAssemblyMarker.Begin();
@@ -346,6 +344,8 @@ namespace VSCodeEditor
 
             //So this sucks a bunch because of managed allocations, but we can't put GenerateProjectJob
             //in a NativeArray because it contains NativeArrays itself...
+            //saving the JobHandles is not enough because we need to clean up all the NativeContainers
+            //after all the jobs are done...theoretically there's Dispose jobs, but those are broken for NativeText in 1.4.0 and lower.
             List<(JobHandle, GenerateProjectJob)> jobList = new(assemblies.Length);
 
             NativeList<ProjectReference> projectsInSln = new(64, Allocator.TempJob);
@@ -394,7 +394,8 @@ namespace VSCodeEditor
                 bool unsafeCode = assembly.compilerOptions.AllowUnsafeCode;
 
                 NativeList<UnsafeList<char>> definesUtf16 = new(256, Allocator.TempJob);
-                NativeList<UnsafeList<char>> sourceFilesUtf16 = new(8192, Allocator.TempJob);
+                NativeList<UnsafeList<char>> sourceFilesUtf16 = new(1024, Allocator.TempJob);
+                NativeList<UnsafeList<char>> assemblyReferencePathsUtf16 = new(512, Allocator.TempJob);
                 NativeText assemblySearchPaths = new(8192, Allocator.TempJob);
                 NativeArray<FixedString4096Bytes> assemblyReferences = new(compiledAssemblyRefs.Length, Allocator.TempJob);
                 NativeArray<ProjectReference> projectReferences = new(maybeAsmdefReferences.Length, Allocator.TempJob);
@@ -404,6 +405,16 @@ namespace VSCodeEditor
                 int refIndex = 0;
                 foreach (string reference in compiledAssemblyRefs)
                 {
+                    UnsafeList<char> assmeblyReferencePathUtf16 = new(reference.Length, Allocator.TempJob);
+                    unsafe
+                    {
+                        fixed (char* sourceStringPtr = reference.AsSpan())
+                        {
+                            assmeblyReferencePathUtf16.AddRange(sourceStringPtr, reference.Length);
+                        }
+                    }
+                    assemblyReferencePathsUtf16.Add(assmeblyReferencePathUtf16);
+
                     //the references we get here are full paths to dll files.
                     //for sdk-style msbuild we just need the module names without the dll extension, but
                     //the directory it's in needs to be added to the search path.
@@ -482,7 +493,8 @@ namespace VSCodeEditor
                     assemblyName = new(assembly.name),
                     assemblyReferences = assemblyReferences,
                     definesUtf16 = definesUtf16,
-                    utf16Files = sourceFilesUtf16,
+                    sourceFilesUtf16 = sourceFilesUtf16,
+                    assemblyReferencePathsUtf16 = assemblyReferencePathsUtf16,
                     projectXmlOutput = projectXmlOutput,
                     assemblySearchPaths = assemblySearchPaths,
                     langVersion = new(langVersion),
@@ -576,7 +588,8 @@ namespace VSCodeEditor
                 handle.Complete();
 
                 jobData.definesUtf16.Dispose();
-                jobData.utf16Files.Dispose();
+                jobData.sourceFilesUtf16.Dispose();
+                jobData.assemblyReferencePathsUtf16.Dispose();
                 jobData.assemblySearchPaths.Dispose();
                 jobData.assemblyReferences.Dispose();
                 jobData.projectReferences.Dispose();
@@ -620,8 +633,9 @@ namespace VSCodeEditor
 
         void SetupProjectSupportedExtensions()
         {
+            //This calls EditorSettings.projectGenerationUserExtensions
             m_ProjectSupportedExtensions = m_AssemblyNameProvider.ProjectSupportedExtensions;
-            Debug.Log($"Project supported extensions: {string.Join('\n', m_ProjectSupportedExtensions)}");
+            // Debug.Log($"Project supported extensions: {string.Join('\n', m_ProjectSupportedExtensions)}");
         }
 
         bool ShouldFileBePartOfSolution(string file)
