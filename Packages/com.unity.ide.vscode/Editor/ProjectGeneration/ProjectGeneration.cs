@@ -388,22 +388,21 @@ namespace VSCodeEditor
 
                 string[] csDefines = assembly.defines;
                 string[] csSourceFiles = assembly.sourceFiles;
-                string[] csRefs = assembly.compiledAssemblyReferences;
+                string[] compiledAssemblyRefs = assembly.compiledAssemblyReferences;
                 Assembly[] maybeAsmdefReferences = assembly.assemblyReferences;
                 string langVersion = assembly.compilerOptions.LanguageVersion;
                 bool unsafeCode = assembly.compilerOptions.AllowUnsafeCode;
 
-                //so it turns out that NativeText is a container and it can't be in NativeArrays...
-                NativeText defines = new(4096, Allocator.TempJob);
+                NativeList<UnsafeList<char>> definesUtf16 = new(256, Allocator.TempJob);
                 NativeList<UnsafeList<char>> sourceFilesUtf16 = new(8192, Allocator.TempJob);
                 NativeText assemblySearchPaths = new(8192, Allocator.TempJob);
-                NativeArray<FixedString4096Bytes> assemblyReferences = new(csRefs.Length, Allocator.TempJob);
+                NativeArray<FixedString4096Bytes> assemblyReferences = new(compiledAssemblyRefs.Length, Allocator.TempJob);
                 NativeArray<ProjectReference> projectReferences = new(maybeAsmdefReferences.Length, Allocator.TempJob);
                 NativeText projectXmlOutput = new(32 * 1024, Allocator.TempJob);
                 NativeList<int> searchPathHashes = new(64, Allocator.Temp);
 
                 int refIndex = 0;
-                foreach (string reference in csRefs)
+                foreach (string reference in compiledAssemblyRefs)
                 {
                     //the references we get here are full paths to dll files.
                     //for sdk-style msbuild we just need the module names without the dll extension, but
@@ -443,22 +442,29 @@ namespace VSCodeEditor
                     string relativeToProject = Path.GetRelativePath(ProjectDirectory, absolutePath);
 
                     //The job should dispose this after conversion
-                    UnsafeList<char> uft16Path = new(relativeToProject.Length, Allocator.TempJob);
+                    UnsafeList<char> utf16Path = new(relativeToProject.Length, Allocator.TempJob);
                     unsafe
                     {
                         fixed (char* pathToCopyPtr = relativeToProject.AsSpan())
                         {
-                            uft16Path.AddRange(pathToCopyPtr, relativeToProject.Length);
+                            utf16Path.AddRange(pathToCopyPtr, relativeToProject.Length);
                         }
                     }
-                    sourceFilesUtf16.Add(uft16Path);
+                    sourceFilesUtf16.Add(utf16Path);
                 }
 
                 foreach (string define in csDefines)
                 {
-                    //Defines need to be in this format for the final output anyway.
-                    defines.Append(define);
-                    defines.Append(';');
+                    //Maybe put this in some helper method...
+                    UnsafeList<char> utf16define = new(define.Length, Allocator.TempJob);
+                    unsafe
+                    {
+                        fixed (char* sourceStringPtr = define.AsSpan())
+                        {
+                            utf16define.AddRange(sourceStringPtr, define.Length);
+                        }
+                        definesUtf16.Add(utf16define);
+                    }
                 }
 
                 //These references are the ones set up via asmdef -> we want a project reference
@@ -475,7 +481,7 @@ namespace VSCodeEditor
                 {
                     assemblyName = new(assembly.name),
                     assemblyReferences = assemblyReferences,
-                    defines = defines,
+                    definesUtf16 = definesUtf16,
                     utf16Files = sourceFilesUtf16,
                     projectXmlOutput = projectXmlOutput,
                     assemblySearchPaths = assemblySearchPaths,
@@ -569,7 +575,7 @@ namespace VSCodeEditor
             {
                 handle.Complete();
 
-                jobData.defines.Dispose();
+                jobData.definesUtf16.Dispose();
                 jobData.utf16Files.Dispose();
                 jobData.assemblySearchPaths.Dispose();
                 jobData.assemblyReferences.Dispose();

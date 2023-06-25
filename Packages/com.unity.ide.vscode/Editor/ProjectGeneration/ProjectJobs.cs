@@ -26,8 +26,7 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public FixedString4096Bytes assemblyName;
     [ReadOnly] public FixedString64Bytes langVersion;
     [ReadOnly] public bool unsafeCode;
-    //we could try to convert this into a parallelfor job by using unsafetext here
-    [ReadOnly] public NativeText defines;
+    [ReadOnly] public NativeList<UnsafeList<char>> definesUtf16;
     [ReadOnly] public NativeList<UnsafeList<char>> utf16Files;
     [ReadOnly] public NativeText assemblySearchPaths;
     [ReadOnly] public NativeArray<FixedString4096Bytes> assemblyReferences;
@@ -71,6 +70,31 @@ struct GenerateProjectJob : IJob
             filePathUtf16.Dispose();
 
             compileItemsXml.AppendFormat(compileFormatString, sourceFileTextUtf8);
+        }
+
+        //Preprocessor defines look like this in the project file:
+        //DEBUG;TRACE;UNITY_2021;NO_THIS_IS_PATRICK
+        NativeText defines = new(4096, Allocator.Temp);
+        NativeText tmpUtf8 = new(512, Allocator.Temp);
+        for (int i = 0; i < definesUtf16.Length; i++)
+        {
+            tmpUtf8.Clear();
+            UnsafeList<char> defineUtf16 = definesUtf16[i];
+
+            unsafe
+            {
+                byte* destPtr = tmpUtf8.GetUnsafePtr();
+                CopyError err = UTF8ArrayUnsafeUtility.Copy(destPtr, out int destLength, tmpUtf8.Length, defineUtf16.Ptr, defineUtf16.Length);
+
+                if (err == CopyError.Truncation && tmpUtf8.TryResize(defineUtf16.Length))
+                {
+                    err = UTF8ArrayUnsafeUtility.Copy(destPtr, out destLength, tmpUtf8.Length, defineUtf16.Ptr, defineUtf16.Length);
+                }
+            }
+
+            defines.Append(tmpUtf8);
+            defines.Add((byte)';');
+            defineUtf16.Dispose();
         }
 
         //write all refs into <Include /> items
