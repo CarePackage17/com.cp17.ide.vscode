@@ -79,7 +79,7 @@ struct GenerateProjectJob : IJob
         for (int i = 0; i < definesUtf16.Length; i++)
         {
             tmpUtf8.Clear();
-            UnsafeList<char> defineUtf16 = definesUtf16[i];
+            using UnsafeList<char> defineUtf16 = definesUtf16[i];
 
             unsafe
             {
@@ -94,7 +94,6 @@ struct GenerateProjectJob : IJob
 
             defines.Append(tmpUtf8);
             defines.Add((byte)';');
-            defineUtf16.Dispose();
         }
 
         //write all refs into <Include /> items
