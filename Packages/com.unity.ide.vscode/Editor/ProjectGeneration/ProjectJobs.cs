@@ -158,20 +158,22 @@ struct GenerateProjectJob : IJob
             referenceItems.AppendFormat(referenceFormatString, assemblyReferences[i]);
         }
 
-        //So this doesn't quite work because search path order matters whereas NativeParallelHashSet does not maintain
-        //insertion order. I guess this worked out of the box, when processing references in order...
-        NativeText searchPathsWithSemi = new(4096, Allocator.Temp);
+        //Assembly search paths need to be concatenated with ';', like defines.
+        //Earlier paths take precedence over later ones:
+        //https://learn.microsoft.com/en-us/visualstudio/msbuild/common-msbuild-project-properties?view=vs-2022#list-of-common-properties-and-parameters
+        NativeText concatenatedSearchPaths = new(4096, Allocator.Temp);
         var paths = searchPaths.ToArray(Allocator.Temp);
 
         foreach (var path in paths)
         {
-            searchPathsWithSemi.Append(path);
-            searchPathsWithSemi.Add((byte)';');
+            concatenatedSearchPaths.Append(path);
+            concatenatedSearchPaths.Add((byte)';');
         }
-        searchPathsWithSemi.Append(scriptAssembliesPath);
-        searchPathsWithSemi.Add((byte)';');
-        FixedString64Bytes letzte = "$(AssemblySearchPaths)";
-        searchPathsWithSemi.Append(letzte);
+
+        concatenatedSearchPaths.Append(scriptAssembliesPath);
+        concatenatedSearchPaths.Add((byte)';');
+        FixedString64Bytes end = "$(AssemblySearchPaths)";
+        concatenatedSearchPaths.Append(end);
 
         //Project references are in their own ItemGroup.
         // <ProjectReference Include="Assembly-CSharp.csproj">
@@ -257,7 +259,7 @@ struct GenerateProjectJob : IJob
                         "<DefineConstants>{3}</DefineConstants>\n" +
                     "</PropertyGroup>\n";
         FixedString32Bytes unsafeStr = unsafeCode ? "true" : "false";
-        projectXmlOutput.AppendFormat(propertyGroupFormatString, langVersion, unsafeStr, searchPathsWithSemi, defines);
+        projectXmlOutput.AppendFormat(propertyGroupFormatString, langVersion, unsafeStr, concatenatedSearchPaths, defines);
 
         //compile and reference belong in an itemgroup
         FixedString64Bytes itemGroupFormatString = "<ItemGroup>\n{0}\n{1}\n</ItemGroup>\n";

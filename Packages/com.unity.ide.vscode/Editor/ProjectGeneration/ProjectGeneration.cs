@@ -547,8 +547,7 @@ namespace VSCodeEditor
 
             s_mainAssemblyGenMarker.End();
 
-            //complete all the jobs
-            //dispose all the things
+            //complete all the jobs, dispose all the things
             foreach ((JobHandle handle, var jobData) in jobList)
             {
                 handle.Complete();
@@ -559,14 +558,13 @@ namespace VSCodeEditor
                 jobData.projectReferences.Dispose();
                 jobData.projectXmlOutput.Dispose();
             }
+            excludedAssemblies.Dispose();
 
             Debug.Log(sb.ToString());
 
             s_slnGenMarker.Begin();
             JobifiedCreateSln(projectsInSln);
             s_slnGenMarker.End();
-
-            excludedAssemblies.Dispose();
         }
 
         static string[] GetSystemAssemblyDirectories(ApiCompatibilityLevel apiCompatLevel)
