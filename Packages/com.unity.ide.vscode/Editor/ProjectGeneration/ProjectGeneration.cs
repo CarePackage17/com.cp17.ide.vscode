@@ -342,6 +342,7 @@ namespace VSCodeEditor
             //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
             //generated for them (excluded by user setting).
             string scriptAssembliesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies"));
+            FixedString4096Bytes scriptAssembliesPathFixed = new(scriptAssembliesPath);
             string[] systemReferenceDirs;
 
             //So this sucks a bunch because of managed allocations, but we can't put GenerateProjectJob
@@ -385,11 +386,12 @@ namespace VSCodeEditor
                 NativeList<UnsafeList<char>> definesUtf16 = new(256, Allocator.TempJob);
                 NativeList<UnsafeList<char>> sourceFilesUtf16 = new(1024, Allocator.TempJob);
                 NativeList<UnsafeList<char>> assemblyReferencePathsUtf16 = new(512, Allocator.TempJob);
-                NativeText assemblySearchPaths = new(8192, Allocator.TempJob);
                 NativeArray<ProjectReference> projectReferences = new(maybeAsmdefReferences.Length, Allocator.TempJob);
                 NativeText projectXmlOutput = new(32 * 1024, Allocator.TempJob);
-                NativeList<int> searchPathHashes = new(64, Allocator.Temp);
 
+                //the references we get here are full paths to dll files.
+                //for sdk-style msbuild we just need the module names without the dll extension, but
+                //the directory it's in needs to be added to the search path.
                 foreach (string reference in compiledAssemblyRefs)
                 {
                     UnsafeList<char> assmeblyReferencePathUtf16 = new(reference.Length, Allocator.TempJob);
@@ -401,27 +403,7 @@ namespace VSCodeEditor
                         }
                     }
                     assemblyReferencePathsUtf16.Add(assmeblyReferencePathUtf16);
-
-                    //the references we get here are full paths to dll files.
-                    //for sdk-style msbuild we just need the module names without the dll extension, but
-                    //the directory it's in needs to be added to the search path.
-                    var refFileName = Path.GetFileNameWithoutExtension(reference);
-
-                    //this will have duplicates. use hashing to get rid of them
-                    //we could do deduplication inside the job (if that ran on a worker it'd not block main as much)
-                    var searchPath = Path.GetDirectoryName(reference);
-                    int hash = searchPath.GetHashCode();
-                    if (!searchPathHashes.Contains(hash))
-                    {
-                        searchPathHashes.Add(hash);
-                        assemblySearchPaths.Append(searchPath);
-                        assemblySearchPaths.Append(';');
-                    }
                 }
-
-                assemblySearchPaths.Append(scriptAssembliesPath);
-                assemblySearchPaths.Add((byte)';');
-                assemblySearchPaths.Append("$(AssemblySearchPaths)");
 
                 foreach (string filePath in csSourceFiles)
                 {
@@ -476,9 +458,9 @@ namespace VSCodeEditor
                     assemblyName = new(assembly.name),
                     definesUtf16 = definesUtf16,
                     sourceFilesUtf16 = sourceFilesUtf16,
+                    scriptAssembliesPath = scriptAssembliesPathFixed,
                     assemblyReferencePathsUtf16 = assemblyReferencePathsUtf16,
                     projectXmlOutput = projectXmlOutput,
-                    assemblySearchPaths = assemblySearchPaths,
                     langVersion = new(langVersion),
                     unsafeCode = unsafeCode,
                     projectReferences = projectReferences,
@@ -574,7 +556,6 @@ namespace VSCodeEditor
                 jobData.definesUtf16.Dispose();
                 jobData.sourceFilesUtf16.Dispose();
                 jobData.assemblyReferencePathsUtf16.Dispose();
-                jobData.assemblySearchPaths.Dispose();
                 jobData.projectReferences.Dispose();
                 jobData.projectXmlOutput.Dispose();
             }

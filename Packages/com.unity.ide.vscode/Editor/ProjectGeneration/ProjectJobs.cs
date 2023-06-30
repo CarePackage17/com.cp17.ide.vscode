@@ -29,9 +29,8 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public NativeList<UnsafeList<char>> definesUtf16;
     [ReadOnly] public NativeList<UnsafeList<char>> sourceFilesUtf16;
     [ReadOnly] public NativeList<UnsafeList<char>> assemblyReferencePathsUtf16;
-    [ReadOnly] public NativeText assemblySearchPaths;
+    [ReadOnly] public FixedString4096Bytes scriptAssembliesPath;
     [ReadOnly] public NativeArray<ProjectReference> projectReferences;
-    //excluded from project generation
     [ReadOnly] public NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies;
 
     public NativeText projectXmlOutput;
@@ -98,6 +97,9 @@ struct GenerateProjectJob : IJob
         //From the assembly reference paths we pass in we can make an array of assembly references +
         //assembly search paths.
         NativeList<FixedString4096Bytes> assemblyReferences = new(assemblyReferencePathsUtf16.Length, Allocator.Temp);
+        NativeList<FixedString4096Bytes> searchPaths = new(256, Allocator.Temp);
+        NativeList<int> searchPathHashes = new(256, Allocator.Temp);
+
         FixedString4096Bytes pathUtf8 = new(new Unicode.Rune(0));
 
         for (int i = 0; i < assemblyReferencePathsUtf16.Length; i++)
@@ -128,26 +130,48 @@ struct GenerateProjectJob : IJob
                 {
                     //get substrings for path and filename
                     FixedString512Bytes fileName = new(new Unicode.Rune(0));
-                    byte* srcOffset = pathUtf8.GetUnsafePtr() + lastSeparatorIndex + 1; //if a path ends in a slash we're fucked
+                    //Start at 1 past the dir separator
+                    //if a path ends in a slash we're fucked because out of bounds, whoops
+                    byte* srcOffset = pathUtf8.GetUnsafePtr() + lastSeparatorIndex + 1;
                     int charsTillEnd = pathUtf8.Length - lastSeparatorIndex - 5; //the minus 5 is for ".dll\0", we don't need that
                     UTF8ArrayUnsafeUtility.Copy(fileName.GetUnsafePtr(), out int destLength, FixedString512Bytes.UTF8MaxLengthInBytes,
                         srcOffset, charsTillEnd);
                     fileName.Length = destLength;
 
-                    // UnityEngine.Debug.Log($"{lastSeparatorIndex}, {fileName}");
+
                     assemblyReferences.Add(fileName);
+
+                    FixedString4096Bytes containingDirectory = new(new Unicode.Rune(0));
+                    srcOffset = pathUtf8.GetUnsafePtr();
+                    UTF8ArrayUnsafeUtility.Copy(containingDirectory.GetUnsafePtr(), out destLength, containingDirectory.Capacity, srcOffset, lastSeparatorIndex);
+                    containingDirectory.Length = destLength;
+
+                    int hashCode = containingDirectory.GetHashCode();
+                    if (!searchPathHashes.Contains(hashCode))
+                    {
+                        searchPathHashes.Add(hashCode);
+                        searchPaths.Add(containingDirectory);
+                    }
                 }
             }
 
             referenceItems.AppendFormat(referenceFormatString, assemblyReferences[i]);
-
-            //TODO:
-            //- Get filename without extension from full path
-            //  - If we get only .dll paths, then we can skip a bunch of work
-            //  - I mean assembly references kinda implies it's only DLLs, right?
-            //- Get path to file without filename, add to search paths hashset
-            //- Add these two things into their collections
         }
+
+        //So this doesn't quite work because search path order matters whereas NativeParallelHashSet does not maintain
+        //insertion order. I guess this worked out of the box, when processing references in order...
+        NativeText searchPathsWithSemi = new(4096, Allocator.Temp);
+        var paths = searchPaths.ToArray(Allocator.Temp);
+
+        foreach (var path in paths)
+        {
+            searchPathsWithSemi.Append(path);
+            searchPathsWithSemi.Add((byte)';');
+        }
+        searchPathsWithSemi.Append(scriptAssembliesPath);
+        searchPathsWithSemi.Add((byte)';');
+        FixedString64Bytes letzte = "$(AssemblySearchPaths)";
+        searchPathsWithSemi.Append(letzte);
 
         //Project references are in their own ItemGroup.
         // <ProjectReference Include="Assembly-CSharp.csproj">
@@ -233,7 +257,7 @@ struct GenerateProjectJob : IJob
                         "<DefineConstants>{3}</DefineConstants>\n" +
                     "</PropertyGroup>\n";
         FixedString32Bytes unsafeStr = unsafeCode ? "true" : "false";
-        projectXmlOutput.AppendFormat(propertyGroupFormatString, langVersion, unsafeStr, assemblySearchPaths, defines);
+        projectXmlOutput.AppendFormat(propertyGroupFormatString, langVersion, unsafeStr, searchPathsWithSemi, defines);
 
         //compile and reference belong in an itemgroup
         FixedString64Bytes itemGroupFormatString = "<ItemGroup>\n{0}\n{1}\n</ItemGroup>\n";
