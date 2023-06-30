@@ -33,7 +33,7 @@ namespace VSCodeEditor
         static ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
         static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
         static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
-        static ProfilerMarker s_excludedAssemblyMarker = new("GetExcludedAssemblies");
+        static ProfilerMarker s_excludedAssemblyMarker = new($"{nameof(GetExcludedAssemblies)}");
         static ProfilerMarker s_mainAssemblyGenMarker = new("MainAssemblyGeneration");
         static ProfilerMarker s_slnGenMarker = new("SlnGeneration");
 
@@ -298,24 +298,10 @@ namespace VSCodeEditor
             }
         }
 
-        void JobifiedSync()
+        void GetExcludedAssemblies(Assembly[] assemblies, NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies)
         {
-            Debug.Log($"Running {nameof(JobifiedSync)}");
-
-            AssembliesType assembliesType = AssembliesType.Editor;
-            //TODO: check settings and pass AssembliesType.Player if the user selected that
-            //here's how rider does it:
-            //https://github.com/needle-mirror/com.unity.ide.rider/blob/master/Rider/Editor/ProjectGeneration/AssemblyNameProvider.cs#L56
-
-            //This generates a lot of garbage, but it's the only way to get this data as of 2021 LTS.
-            Assembly[] assemblies = CompilationPipeline.GetAssemblies(assembliesType);
-
             s_excludedAssemblyMarker.Begin();
-            //We can definitely cache this too, user settings change doesn't happen often usually.
-            NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies = new(assemblies.Length, Allocator.TempJob);
-            //Before generating anything, we need to know all the assemblies that are excluded from project
-            //generation, otherwise we won't be able to set up references correctly. So it's another loop
-            //before the generation loop.
+
             for (int i = 0; i < assemblies.Length; i++)
             {
                 Assembly assembly = assemblies[i];
@@ -327,9 +313,6 @@ namespace VSCodeEditor
                 {
                     PackageSource source = packageInfo.source;
 
-                    //check if user settings exclude sources, then skip processing assembly if it's excluded
-                    //assembly is excluded when its source is excluded in user settings
-                    //source excluded in settings when it doesn't have projectgenerationflag
                     if (!IsAssemblyIncluded(source, m_AssemblyNameProvider.ProjectGenerationFlag))
                     {
                         excludedAssemblies.Add(new(assembly.name));
@@ -338,12 +321,29 @@ namespace VSCodeEditor
             }
 
             s_excludedAssemblyMarker.End();
+        }
+
+        void JobifiedSync()
+        {
+            Debug.Log($"Running {nameof(JobifiedSync)}");
 
             //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
             //generated for them (excluded by user setting).
             string scriptAssembliesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies"));
             FixedString4096Bytes scriptAssembliesPathFixed = new(scriptAssembliesPath);
             string[] systemReferenceDirs;
+
+            AssembliesType assembliesType = AssembliesType.Editor;
+            //TODO: check settings and pass AssembliesType.Player if the user selected that
+            //here's how rider does it:
+            //https://github.com/needle-mirror/com.unity.ide.rider/blob/master/Rider/Editor/ProjectGeneration/AssemblyNameProvider.cs#L56
+
+            //This generates a lot of garbage, but it's the only way to get this data as of 2021 LTS.
+            Assembly[] assemblies = CompilationPipeline.GetAssemblies(assembliesType);
+
+            //We can definitely cache this too, user settings change doesn't happen often usually.
+            NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies = new(assemblies.Length, Allocator.TempJob);
+            GetExcludedAssemblies(assemblies, excludedAssemblies);
 
             //So this sucks a bunch because of managed allocations, but we can't put GenerateProjectJob
             //in a NativeArray because it contains NativeArrays itself...
