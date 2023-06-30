@@ -1,15 +1,16 @@
 {
-  "name": "com.unity.ide.vscode",
+  "name": "com.cp17.ide.vscode",
   "displayName": "Visual Studio Code Editor",
-  "description": "Code editor integration for supporting Visual Studio Code as code editor for unity. Adds support for generating csproj files for intellisense purposes, auto discovery of installations, etc.",
+  "description": "Adds support for using Visual Studio Code with Unity.\nGenerates SDK-style .csproj files for code completion and usage with dotnet CLI tools.",
   "version": "2.0.0",
   "unity": "2021.3",
   "unityRelease": "0f1",
   "dependencies": {
-	  "com.unity.collections": "1.4.0",
-	  "com.unity.burst": "1.6.6"
+    "com.unity.collections": "1.4.0",
+    "com.unity.burst": "1.6.6"
   },
   "relatedPackages": {
-    "com.unity.ide.vscode.tests": "1.2.3"
-  }
+    "com.cp17.ide.vscode.tests": "1.2.3"
+  },
+  "author": "CarePackage17"
 }
