@@ -386,12 +386,10 @@ namespace VSCodeEditor
                 NativeList<UnsafeList<char>> sourceFilesUtf16 = new(1024, Allocator.TempJob);
                 NativeList<UnsafeList<char>> assemblyReferencePathsUtf16 = new(512, Allocator.TempJob);
                 NativeText assemblySearchPaths = new(8192, Allocator.TempJob);
-                NativeArray<FixedString4096Bytes> assemblyReferences = new(compiledAssemblyRefs.Length, Allocator.TempJob);
                 NativeArray<ProjectReference> projectReferences = new(maybeAsmdefReferences.Length, Allocator.TempJob);
                 NativeText projectXmlOutput = new(32 * 1024, Allocator.TempJob);
                 NativeList<int> searchPathHashes = new(64, Allocator.Temp);
 
-                int refIndex = 0;
                 foreach (string reference in compiledAssemblyRefs)
                 {
                     UnsafeList<char> assmeblyReferencePathUtf16 = new(reference.Length, Allocator.TempJob);
@@ -419,10 +417,6 @@ namespace VSCodeEditor
                         assemblySearchPaths.Append(searchPath);
                         assemblySearchPaths.Append(';');
                     }
-
-                    //come on, why can't we init a fixedstring from span :(
-                    assemblyReferences[refIndex] = new(refFileName.ToString());
-                    refIndex++;
                 }
 
                 assemblySearchPaths.Append(scriptAssembliesPath);
@@ -480,7 +474,6 @@ namespace VSCodeEditor
                 GenerateProjectJob generateJob = new()
                 {
                     assemblyName = new(assembly.name),
-                    assemblyReferences = assemblyReferences,
                     definesUtf16 = definesUtf16,
                     sourceFilesUtf16 = sourceFilesUtf16,
                     assemblyReferencePathsUtf16 = assemblyReferencePathsUtf16,
@@ -582,7 +575,6 @@ namespace VSCodeEditor
                 jobData.sourceFilesUtf16.Dispose();
                 jobData.assemblyReferencePathsUtf16.Dispose();
                 jobData.assemblySearchPaths.Dispose();
-                jobData.assemblyReferences.Dispose();
                 jobData.projectReferences.Dispose();
                 jobData.projectXmlOutput.Dispose();
             }

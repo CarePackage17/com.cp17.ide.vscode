@@ -30,7 +30,6 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public NativeList<UnsafeList<char>> sourceFilesUtf16;
     [ReadOnly] public NativeList<UnsafeList<char>> assemblyReferencePathsUtf16;
     [ReadOnly] public NativeText assemblySearchPaths;
-    [ReadOnly] public NativeArray<FixedString4096Bytes> assemblyReferences;
     [ReadOnly] public NativeArray<ProjectReference> projectReferences;
     //excluded from project generation
     [ReadOnly] public NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies;
@@ -69,29 +68,6 @@ struct GenerateProjectJob : IJob
             compileItemsXml.AppendFormat(compileFormatString, sourceFileTextUtf8);
         }
 
-        //From the assembly reference paths we pass in we can make an array of assembly references +
-        //assembly search paths.
-        NativeList<FixedString4096Bytes> assemblyReferenceNames = new(assemblyReferencePathsUtf16.Length, Allocator.Temp);
-        FixedString4096Bytes pathUtf8 = new();
-        for (int i = 0; i < assemblyReferencePathsUtf16.Length; i++)
-        {
-            pathUtf8.Clear();
-            using UnsafeList<char> pathUtf16 = assemblyReferencePathsUtf16[i];
-            unsafe
-            {
-                byte* destPtr = pathUtf8.GetUnsafePtr();
-                UTF8ArrayUnsafeUtility.Copy(destPtr, out int _, pathUtf8.Length, pathUtf16.Ptr, pathUtf16.Length);
-            }
-
-            assemblyReferenceNames.Add(pathUtf8);
-
-            //TODO:
-            //- Get filename without extension from full path
-            //  - If we get only .dll paths, then we can skip a bunch of work
-            //- Get path to file without filename, add to search paths hashset
-            //- Add these two things into their collections
-        }
-
         //Preprocessor defines look like this in the project file:
         //DEBUG;TRACE;UNITY_2021;NO_THIS_IS_PATRICK
         NativeText defines = new(4096, Allocator.Temp);
@@ -119,9 +95,58 @@ struct GenerateProjectJob : IJob
         NativeText referenceItems = new(Allocator.Temp);
         FixedString32Bytes referenceFormatString = "<Reference Include=\"{0}\" />\n";
 
-        for (int i = 0; i < assemblyReferences.Length; i++)
+        //From the assembly reference paths we pass in we can make an array of assembly references +
+        //assembly search paths.
+        NativeList<FixedString4096Bytes> assemblyReferences = new(assemblyReferencePathsUtf16.Length, Allocator.Temp);
+        FixedString4096Bytes pathUtf8 = new(new Unicode.Rune(0));
+
+        for (int i = 0; i < assemblyReferencePathsUtf16.Length; i++)
         {
+            pathUtf8.Clear();
+            using UnsafeList<char> pathUtf16 = assemblyReferencePathsUtf16[i];
+            unsafe
+            {
+                byte* destPtr = pathUtf8.GetUnsafePtr();
+                CopyError err = UTF8ArrayUnsafeUtility.Copy(destPtr, out int destLen, pathUtf8.Capacity, pathUtf16.Ptr, pathUtf16.Length);
+
+                //do we really need to do this ourselves?
+                //probably because unsafe whatever doesn't do shit for us. I guess that means all the other copies only worked on the
+                //retry path? what? debug this.
+                pathUtf8.Length = destLen;
+            }
+
+            //decimal 47 is '/'
+            //https://en.wikipedia.org/wiki/List_of_Unicode_characters#Basic_Latin
+            FixedString32Bytes separator = new(new Unicode.Rune(47));
+
+            int lastSeparatorIndex = -1;
+            unsafe
+            {
+                lastSeparatorIndex = pathUtf8.LastIndexOf(separator);
+
+                if (lastSeparatorIndex != -1)
+                {
+                    //get substrings for path and filename
+                    FixedString512Bytes fileName = new(new Unicode.Rune(0));
+                    byte* srcOffset = pathUtf8.GetUnsafePtr() + lastSeparatorIndex + 1; //if a path ends in a slash we're fucked
+                    int charsTillEnd = pathUtf8.Length - lastSeparatorIndex - 5; //the minus 5 is for ".dll\0", we don't need that
+                    UTF8ArrayUnsafeUtility.Copy(fileName.GetUnsafePtr(), out int destLength, FixedString512Bytes.UTF8MaxLengthInBytes,
+                        srcOffset, charsTillEnd);
+                    fileName.Length = destLength;
+
+                    // UnityEngine.Debug.Log($"{lastSeparatorIndex}, {fileName}");
+                    assemblyReferences.Add(fileName);
+                }
+            }
+
             referenceItems.AppendFormat(referenceFormatString, assemblyReferences[i]);
+
+            //TODO:
+            //- Get filename without extension from full path
+            //  - If we get only .dll paths, then we can skip a bunch of work
+            //  - I mean assembly references kinda implies it's only DLLs, right?
+            //- Get path to file without filename, add to search paths hashset
+            //- Add these two things into their collections
         }
 
         //Project references are in their own ItemGroup.
