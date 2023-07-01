@@ -323,9 +323,23 @@ namespace VSCodeEditor
             s_excludedAssemblyMarker.End();
         }
 
+        //Could this be an extension method on string?
+        UnsafeList<char> ToUnsafeList(string source, Allocator allocator)
+        {
+            UnsafeList<char> data = new(source.Length, allocator);
+            unsafe
+            {
+                fixed (char* sourceStringPtr = source.AsSpan())
+                {
+                    data.AddRange(sourceStringPtr, source.Length);
+                }
+            }
+            return data;
+        }
+
         void JobifiedSync()
         {
-            Debug.Log($"Running {nameof(JobifiedSync)}");
+            // Debug.Log($"Running {nameof(JobifiedSync)}");
 
             //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
             //generated for them (excluded by user setting).
@@ -394,14 +408,7 @@ namespace VSCodeEditor
                 //the directory it's in needs to be added to the search path.
                 foreach (string reference in compiledAssemblyRefs)
                 {
-                    UnsafeList<char> assmeblyReferencePathUtf16 = new(reference.Length, Allocator.TempJob);
-                    unsafe
-                    {
-                        fixed (char* sourceStringPtr = reference.AsSpan())
-                        {
-                            assmeblyReferencePathUtf16.AddRange(sourceStringPtr, reference.Length);
-                        }
-                    }
+                    UnsafeList<char> assmeblyReferencePathUtf16 = ToUnsafeList(reference, Allocator.TempJob);
                     assemblyReferencePathsUtf16.Add(assmeblyReferencePathUtf16);
                 }
 
@@ -418,29 +425,14 @@ namespace VSCodeEditor
                     string relativeToProject = Path.GetRelativePath(ProjectDirectory, absolutePath);
 
                     //The job should dispose this after conversion
-                    UnsafeList<char> utf16Path = new(relativeToProject.Length, Allocator.TempJob);
-                    unsafe
-                    {
-                        fixed (char* pathToCopyPtr = relativeToProject.AsSpan())
-                        {
-                            utf16Path.AddRange(pathToCopyPtr, relativeToProject.Length);
-                        }
-                    }
+                    UnsafeList<char> utf16Path = ToUnsafeList(relativeToProject, Allocator.TempJob);
                     sourceFilesUtf16.Add(utf16Path);
                 }
 
                 foreach (string define in csDefines)
                 {
-                    //Maybe put this in some helper method...
-                    UnsafeList<char> utf16define = new(define.Length, Allocator.TempJob);
-                    unsafe
-                    {
-                        fixed (char* sourceStringPtr = define.AsSpan())
-                        {
-                            utf16define.AddRange(sourceStringPtr, define.Length);
-                        }
-                        definesUtf16.Add(utf16define);
-                    }
+                    UnsafeList<char> utf16define = ToUnsafeList(define, Allocator.TempJob);
+                    definesUtf16.Add(utf16define);
                 }
 
                 //These references are the ones set up via asmdef -> we want a project reference

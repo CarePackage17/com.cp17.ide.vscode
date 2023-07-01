@@ -2,6 +2,7 @@
 
 ## [2.0.0] - Unreleased
 
+Move to Job System for generating project files -> significant performance improvement
 Move to generating SDK-style projects
 *Support for full framework projects has been removed*
 

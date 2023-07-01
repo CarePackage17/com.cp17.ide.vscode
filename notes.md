@@ -6,7 +6,7 @@
 # TODO
 
 - ~~Respect user settings instead of generating all the projects all the time~~
-- Move cost of string conversion (utf16 to utf8) into job so main thread doesn't drown in work
+- ~~Move cost of string conversion (utf16 to utf8) into job so main thread doesn't drown in work~~
 - Parse stuff from response files and add into the project (nullable, extra files, compiler switches, etc.)
 - Clean up code (it's pretty ugly rn)
 - Test on Windows
