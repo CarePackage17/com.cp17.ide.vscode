@@ -420,31 +420,20 @@ namespace VSCodeEditor
                 NativeArray<ProjectReference> projectReferences = new(maybeAsmdefReferences.Length, Allocator.TempJob);
                 NativeText projectXmlOutput = new(32 * 1024, Allocator.TempJob);
 
-                //The references we get here are full paths to dll files.
-                //For reference items in SDK-style MSBuild we just need the module names without the dll extension, but
-                //the directory it's in needs to be added to the search path.
-                foreach (string reference in compiledAssemblyRefs)
-                {
-                    UnsafeList<char> assmeblyReferencePathUtf16 = reference.ToUnsafeList(Allocator.TempJob);
-                    assemblyReferencePathsUtf16.Add(assmeblyReferencePathUtf16);
-                }
-
-                ResolvePathJob pathJob = new()
+                PrepareDataJob prepJob = new()
                 {
                     pathArrayHandle = GCHandle.Alloc(csSourceFiles),
                     projectDirectoryStringHandle = GCHandle.Alloc(ProjectDirectory),
+                    compiledAssemblyRefsHandle = GCHandle.Alloc(compiledAssemblyRefs),
+                    definesArrayHandle = GCHandle.Alloc(csDefines),
+                    definesUtf16 = definesUtf16,
+                    assemblyReferencePathsUtf16 = assemblyReferencePathsUtf16,
                     sourceFilesUtf16 = sourceFilesUtf16
                 };
 
-                JobHandle pathJobHandle = pathJob.Schedule();
+                JobHandle prepJobHandle = prepJob.Schedule();
 
-                foreach (string define in csDefines)
-                {
-                    UnsafeList<char> utf16define = define.ToUnsafeList(Allocator.TempJob);
-                    definesUtf16.Add(utf16define);
-                }
-
-                //These references contain ones that are  set up via asmdef -> we want a project reference
+                //These references contain ones that are set up via asmdef -> we want a project reference
                 //here (unless it's from a source the user excluded in settings).
                 int refIndex = 0;
                 foreach (Assembly a in maybeAsmdefReferences)
@@ -473,7 +462,7 @@ namespace VSCodeEditor
                     filePath = new FixedString4096Bytes(Path.Combine(ProjectDirectory, $"{assembly.name}.csproj"))
                 };
 
-                var projHandle = generateJob.Schedule(pathJobHandle);
+                var projHandle = generateJob.Schedule(prepJobHandle);
                 var handle = writeJob.Schedule(projHandle);
 
                 //Unfortunately, Dispose(JobHandle) seems to be broken for NativeText :(

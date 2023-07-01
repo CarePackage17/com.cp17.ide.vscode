@@ -19,26 +19,48 @@ struct ProjectReference
     }
 }
 
-struct ResolvePathJob : IJob
+struct PrepareDataJob : IJob
 {
-    public GCHandle pathArrayHandle;
-    public GCHandle projectDirectoryStringHandle;
+    [ReadOnly] public GCHandle pathArrayHandle;
+    [ReadOnly] public GCHandle projectDirectoryStringHandle;
+    [ReadOnly] public GCHandle compiledAssemblyRefsHandle;
+    [ReadOnly] public GCHandle definesArrayHandle;
 
     [WriteOnly]
     public NativeList<UnsafeList<char>> sourceFilesUtf16;
 
+    [WriteOnly]
+    public NativeList<UnsafeList<char>> assemblyReferencePathsUtf16;
+
+    [WriteOnly]
+    public NativeList<UnsafeList<char>> definesUtf16;
+
     public void Execute()
     {
         var csSourceFiles = pathArrayHandle.Target as string[];
+        var compiledAssemblyRefs = compiledAssemblyRefsHandle.Target as string[];
+        var csDefines = definesArrayHandle.Target as string[];
         var projectDirectory = projectDirectoryStringHandle.Target as string;
 
         try
         {
+            //The references we get here are full paths to dll files.
+            //For reference items in SDK-style MSBuild we just need the module names without the dll extension, but
+            //the directory it's in needs to be added to the search path.
+            foreach (string reference in compiledAssemblyRefs)
+            {
+                UnsafeList<char> assemblyReferencePathUtf16 = reference.ToUnsafeList(Allocator.TempJob);
+                assemblyReferencePathsUtf16.Add(assemblyReferencePathUtf16);
+            }
+
+            foreach (string define in csDefines)
+            {
+                UnsafeList<char> utf16define = define.ToUnsafeList(Allocator.TempJob);
+                definesUtf16.Add(utf16define);
+            }
+
             foreach (string filePath in csSourceFiles)
             {
-                //Lots of GC allocs here still.
-                //What if we could move path resolution and copy to unsafelist into a managed job?
-
                 //We get file paths like Packages/... but those don't exist on the file system;
                 //Unity docs suggest calling GetFullPath: https://docs.unity3d.com/Manual/upm-assets.html
                 //Internally Unity uses MonoIO to remap.
@@ -56,6 +78,8 @@ struct ResolvePathJob : IJob
         {
             pathArrayHandle.Free();
             projectDirectoryStringHandle.Free();
+            compiledAssemblyRefsHandle.Free();
+            definesArrayHandle.Free();
         }
     }
 }
