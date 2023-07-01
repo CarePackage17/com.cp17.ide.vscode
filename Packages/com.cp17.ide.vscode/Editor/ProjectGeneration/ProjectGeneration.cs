@@ -29,6 +29,22 @@ namespace VSCodeEditor
         bool SolutionExists();
     }
 
+    internal static class Extensions
+    {
+        public static UnsafeList<char> ToUnsafeList(this string source, Allocator allocator)
+        {
+            UnsafeList<char> data = new(source.Length, allocator);
+            unsafe
+            {
+                fixed (char* sourceStringPtr = source.AsSpan())
+                {
+                    data.AddRangeNoResize(sourceStringPtr, source.Length);
+                }
+            }
+            return data;
+        }
+    }
+
     public class ProjectGeneration : IGenerator
     {
         static ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
@@ -338,20 +354,6 @@ namespace VSCodeEditor
             s_excludedAssemblyMarker.End();
         }
 
-        //Could this be an extension method on string?
-        UnsafeList<char> ToUnsafeList(string source, Allocator allocator)
-        {
-            UnsafeList<char> data = new(source.Length, allocator);
-            unsafe
-            {
-                fixed (char* sourceStringPtr = source.AsSpan())
-                {
-                    data.AddRangeNoResize(sourceStringPtr, source.Length);
-                }
-            }
-            return data;
-        }
-
         void JobifiedSync()
         {
             // Debug.Log($"Running {nameof(JobifiedSync)}");
@@ -423,7 +425,7 @@ namespace VSCodeEditor
                 //the directory it's in needs to be added to the search path.
                 foreach (string reference in compiledAssemblyRefs)
                 {
-                    UnsafeList<char> assmeblyReferencePathUtf16 = ToUnsafeList(reference, Allocator.TempJob);
+                    UnsafeList<char> assmeblyReferencePathUtf16 = reference.ToUnsafeList(Allocator.TempJob);
                     assemblyReferencePathsUtf16.Add(assmeblyReferencePathUtf16);
                 }
 
@@ -442,14 +444,14 @@ namespace VSCodeEditor
                     string relativeToProject = Path.GetRelativePath(ProjectDirectory, filePath);
 
                     //The job should dispose this after conversion
-                    UnsafeList<char> utf16Path = ToUnsafeList(relativeToProject, Allocator.TempJob);
+                    UnsafeList<char> utf16Path = relativeToProject.ToUnsafeList(Allocator.TempJob);
                     sourceFilesUtf16.Add(utf16Path);
                 }
                 s_setupSourceFilesData.End();
 
                 foreach (string define in csDefines)
                 {
-                    UnsafeList<char> utf16define = ToUnsafeList(define, Allocator.TempJob);
+                    UnsafeList<char> utf16define = define.ToUnsafeList(Allocator.TempJob);
                     definesUtf16.Add(utf16define);
                 }
 

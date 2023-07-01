@@ -4,6 +4,8 @@ using Unity.Burst;
 using System.IO;
 using System;
 using Unity.Collections.LowLevel.Unsafe;
+using System.Runtime.InteropServices;
+using VSCodeEditor;
 
 struct ProjectReference
 {
@@ -14,6 +16,39 @@ struct ProjectReference
     {
         this.name = name;
         this.guid = guid;
+    }
+}
+
+struct ResolvePathJob : IJob
+{
+    public GCHandle pathArrayHandle;
+    public GCHandle projectDirectoryStringHandle;
+
+    [WriteOnly]
+    public NativeList<UnsafeList<char>> sourceFilesUtf16;
+
+    public void Execute()
+    {
+        var csSourceFiles = pathArrayHandle.Target as string[];
+        var projectDirectory = projectDirectoryStringHandle.Target as string;
+
+        foreach (string filePath in csSourceFiles)
+        {
+            //Lots of GC allocs here still.
+            //What if we could move path resolution and copy to unsafelist into a managed job?
+
+            //We get file paths like Packages/... but those don't exist on the file system;
+            //Unity docs suggest calling GetFullPath: https://docs.unity3d.com/Manual/upm-assets.html
+            //Internally Unity uses MonoIO to remap.
+            //For source files we need paths relative to project directory and luckily Path.GetRelativePath calls
+            //GetFullPath internally, so we don't need to (less GC allocs?)
+            //https://learn.microsoft.com/en-us/dotnet/api/system.io.path.getrelativepath?view=netstandard-2.1#remarks
+            string relativeToProject = Path.GetRelativePath(projectDirectory, filePath);
+
+            //The job should dispose this after conversion
+            UnsafeList<char> utf16Path = relativeToProject.ToUnsafeList(Allocator.TempJob);
+            sourceFilesUtf16.Add(utf16Path);
+        }
     }
 }
 
