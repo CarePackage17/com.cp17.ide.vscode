@@ -19,6 +19,7 @@ namespace VSCodeEditor
 {
     public interface IGenerator
     {
+        public bool OnlyJobified { get; set; }
         bool SyncIfNeeded(List<string> affectedFiles, string[] reimportedFiles);
         void Sync();
         string SolutionFile();
@@ -129,6 +130,8 @@ namespace VSCodeEditor
 
         public string ProjectDirectory { get; }
         IAssemblyNameProvider IGenerator.AssemblyNameProvider => m_AssemblyNameProvider;
+
+        public bool OnlyJobified { get; set; }
 
         public void GenerateAll(bool generateAll)
         {
@@ -285,17 +288,27 @@ namespace VSCodeEditor
 
         public void Sync()
         {
-            using (s_syncMarker.Auto())
+            if (OnlyJobified)
             {
-                SetupProjectSupportedExtensions();
-                GenerateAndWriteSolutionAndProjects();
-
-                // OnGeneratedCSProjectFiles();
+                using (s_jobifiedSyncMarker.Auto())
+                {
+                    JobifiedSync();
+                }
             }
-
-            using (s_jobifiedSyncMarker.Auto())
+            else
             {
-                JobifiedSync();
+                using (s_syncMarker.Auto())
+                {
+                    SetupProjectSupportedExtensions();
+                    GenerateAndWriteSolutionAndProjects();
+
+                    // OnGeneratedCSProjectFiles();
+                }
+
+                using (s_jobifiedSyncMarker.Auto())
+                {
+                    JobifiedSync();
+                }
             }
         }
 
