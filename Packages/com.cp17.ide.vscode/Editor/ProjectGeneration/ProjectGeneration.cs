@@ -178,6 +178,7 @@ namespace VSCodeEditor
         public bool SyncIfNeeded(List<string> affectedFiles, string[] reimportedFiles)
         {
             //TODO: restore this after figuring out how Unity calls stuff
+            Debug.Log($"{nameof(SyncIfNeeded)} called");
 
             // Profiler.BeginSample("SolutionSynchronizerSync");
             // SetupProjectSupportedExtensions();
@@ -430,6 +431,7 @@ namespace VSCodeEditor
                 foreach (string filePath in csSourceFiles)
                 {
                     //Lots of GC allocs here still.
+                    //What if we could move path resolution and copy to unsafelist into a managed job?
 
                     //We get file paths like Packages/... but those don't exist on the file system;
                     //Unity docs suggest calling GetFullPath: https://docs.unity3d.com/Manual/upm-assets.html
