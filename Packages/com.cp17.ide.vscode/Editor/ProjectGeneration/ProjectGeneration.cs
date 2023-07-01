@@ -193,18 +193,17 @@ namespace VSCodeEditor
         /// </param>
         public bool SyncIfNeeded(List<string> affectedFiles, string[] reimportedFiles)
         {
-            //TODO: restore this after figuring out how Unity calls stuff
-            if (affectedFiles.Count > 0 && reimportedFiles.Length > 0)
+            string affected = string.Join(',', affectedFiles);
+            string reimported = string.Join(',', reimportedFiles);
+
+            Debug.Log($"{nameof(SyncIfNeeded)} called with affectedFiles: {affected}, reimportedFiles: {reimported}");
+
+            if (affectedFiles.Count > 0 || reimportedFiles.Length > 0)
             {
-                string affected = string.Join(',', affectedFiles);
-                string reimported = string.Join(',', reimportedFiles);
-
-                Debug.Log($"{nameof(SyncIfNeeded)} called with affectedFiles: {affected}, reimportedFiles: {reimported}");
-
                 JobifiedSync();
             }
 
-
+            //TODO: restore this after figuring out how Unity calls stuff
             // Profiler.BeginSample("SolutionSynchronizerSync");
             // SetupProjectSupportedExtensions();
 
