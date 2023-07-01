@@ -416,15 +416,15 @@ namespace VSCodeEditor
                 s_setupSourceFilesData.Begin();
                 foreach (string filePath in csSourceFiles)
                 {
-                    //problem: we get paths like Packages/... but those don't exist on the file system;
-                    //try this: https://docs.unity3d.com/Manual/upm-assets.html
-                    //It does get absolute paths (Unity uses MonoIO to remap), we need relative to project dir (and old code does that)
-                    string absolutePath = Path.GetFullPath(filePath);
+                    //Lots of GC allocs here still.
 
-                    //It turns out this takes entirely too much time. See if we can get rid of it or at least move to a managed
-                    //job so it doesn't stall the main thread as much.
-                    //Same goes for GetFullPath and GetFileName/GetDirectoryName
-                    string relativeToProject = Path.GetRelativePath(ProjectDirectory, absolutePath);
+                    //We get file paths like Packages/... but those don't exist on the file system;
+                    //Unity docs suggest calling GetFullPath: https://docs.unity3d.com/Manual/upm-assets.html
+                    //Internally Unity uses MonoIO to remap.
+                    //For source files we need paths relative to project directory and luckily Path.GetRelativePath calls
+                    //GetFullPath internally, so we don't need to (less GC allocs?)
+                    //https://learn.microsoft.com/en-us/dotnet/api/system.io.path.getrelativepath?view=netstandard-2.1#remarks
+                    string relativeToProject = Path.GetRelativePath(ProjectDirectory, filePath);
 
                     //The job should dispose this after conversion
                     UnsafeList<char> utf16Path = ToUnsafeList(relativeToProject, Allocator.TempJob);
