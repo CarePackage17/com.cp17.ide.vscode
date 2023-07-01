@@ -194,7 +194,16 @@ namespace VSCodeEditor
         public bool SyncIfNeeded(List<string> affectedFiles, string[] reimportedFiles)
         {
             //TODO: restore this after figuring out how Unity calls stuff
-            Debug.Log($"{nameof(SyncIfNeeded)} called");
+            if (affectedFiles.Count > 0 && reimportedFiles.Length > 0)
+            {
+                string affected = string.Join(',', affectedFiles);
+                string reimported = string.Join(',', reimportedFiles);
+
+                Debug.Log($"{nameof(SyncIfNeeded)} called with affectedFiles: {affected}, reimportedFiles: {reimported}");
+
+                JobifiedSync();
+            }
+
 
             // Profiler.BeginSample("SolutionSynchronizerSync");
             // SetupProjectSupportedExtensions();
@@ -307,10 +316,7 @@ namespace VSCodeEditor
         {
             if (OnlyJobified)
             {
-                using (s_jobifiedSyncMarker.Auto())
-                {
-                    JobifiedSync();
-                }
+                JobifiedSync();
             }
             else
             {
@@ -322,10 +328,7 @@ namespace VSCodeEditor
                     // OnGeneratedCSProjectFiles();
                 }
 
-                using (s_jobifiedSyncMarker.Auto())
-                {
-                    JobifiedSync();
-                }
+                JobifiedSync();
             }
         }
 
@@ -356,6 +359,7 @@ namespace VSCodeEditor
 
         void JobifiedSync()
         {
+            s_jobifiedSyncMarker.Begin();
             // Debug.Log($"Running {nameof(JobifiedSync)}");
 
             //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
@@ -552,9 +556,9 @@ namespace VSCodeEditor
 
             Debug.Log(sb.ToString());
 
-            s_slnGenMarker.Begin();
             JobifiedCreateSln(projectsInSln);
-            s_slnGenMarker.End();
+
+            s_jobifiedSyncMarker.End();
         }
 
         static string[] GetSystemAssemblyDirectories(ApiCompatibilityLevel apiCompatLevel)
@@ -583,6 +587,8 @@ namespace VSCodeEditor
 
         void JobifiedCreateSln(NativeList<ProjectReference> projectsInSln)
         {
+            s_slnGenMarker.Begin();
+
             NativeText slnText = new(8192, Allocator.TempJob);
             GenerateSlnJob slnJob = new()
             {
@@ -602,6 +608,8 @@ namespace VSCodeEditor
 
             slnText.Dispose();
             projectsInSln.Dispose();
+
+            s_slnGenMarker.End();
         }
 
         void SetupProjectSupportedExtensions()
