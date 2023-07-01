@@ -35,6 +35,7 @@ namespace VSCodeEditor
         static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
         static ProfilerMarker s_excludedAssemblyMarker = new($"{nameof(GetExcludedAssemblies)}");
         static ProfilerMarker s_mainAssemblyGenMarker = new("MainAssemblyGeneration");
+        static ProfilerMarker s_setupSourceFilesData = new("SetupSourceFilesData");
         static ProfilerMarker s_slnGenMarker = new("SlnGeneration");
 
         //These don't change at runtime, so we can cache them once and use them forever.
@@ -331,7 +332,7 @@ namespace VSCodeEditor
             {
                 fixed (char* sourceStringPtr = source.AsSpan())
                 {
-                    data.AddRange(sourceStringPtr, source.Length);
+                    data.AddRangeNoResize(sourceStringPtr, source.Length);
                 }
             }
             return data;
@@ -412,6 +413,7 @@ namespace VSCodeEditor
                     assemblyReferencePathsUtf16.Add(assmeblyReferencePathUtf16);
                 }
 
+                s_setupSourceFilesData.Begin();
                 foreach (string filePath in csSourceFiles)
                 {
                     //problem: we get paths like Packages/... but those don't exist on the file system;
@@ -428,6 +430,7 @@ namespace VSCodeEditor
                     UnsafeList<char> utf16Path = ToUnsafeList(relativeToProject, Allocator.TempJob);
                     sourceFilesUtf16.Add(utf16Path);
                 }
+                s_setupSourceFilesData.End();
 
                 foreach (string define in csDefines)
                 {
@@ -437,11 +440,11 @@ namespace VSCodeEditor
 
                 //These references contain ones that are  set up via asmdef -> we want a project reference
                 //here (unless it's from a source the user excluded in settings).
-                int refIndex2 = 0;
+                int refIndex = 0;
                 foreach (Assembly a in maybeAsmdefReferences)
                 {
-                    projectReferences[refIndex2] = new(a.name, ProjectGuid(a.name));
-                    refIndex2++;
+                    projectReferences[refIndex] = new(a.name, ProjectGuid(a.name));
+                    refIndex++;
                 }
 
                 GenerateProjectJob generateJob = new()
