@@ -403,8 +403,8 @@ namespace VSCodeEditor
                 NativeArray<ProjectReference> projectReferences = new(maybeAsmdefReferences.Length, Allocator.TempJob);
                 NativeText projectXmlOutput = new(32 * 1024, Allocator.TempJob);
 
-                //the references we get here are full paths to dll files.
-                //for sdk-style msbuild we just need the module names without the dll extension, but
+                //The references we get here are full paths to dll files.
+                //For reference items in SDK-style MSBuild we just need the module names without the dll extension, but
                 //the directory it's in needs to be added to the search path.
                 foreach (string reference in compiledAssemblyRefs)
                 {
@@ -435,9 +435,8 @@ namespace VSCodeEditor
                     definesUtf16.Add(utf16define);
                 }
 
-                //These references are the ones set up via asmdef -> we want a project reference
-                //here. I think the assembly name should be enough? That's how we generate project names
-                //anyway, right?
+                //These references contain ones that are  set up via asmdef -> we want a project reference
+                //here (unless it's from a source the user excluded in settings).
                 int refIndex2 = 0;
                 foreach (Assembly a in maybeAsmdefReferences)
                 {
@@ -470,6 +469,7 @@ namespace VSCodeEditor
 
                 //Unfortunately, Dispose(JobHandle) seems to be broken for NativeText :(
                 //Let's see if Unity fixes it.
+                //https://issuetracker.unity3d.com/issues/burst-collections-nullreferenceexceptions-thrown-when-using-nativetext-dot-dispose-jobhandle
                 // NativeArray<JobHandle> cleanupJobs = new(6, Allocator.Temp);
                 // cleanupJobs[0] = assemblyReferences.Dispose(handle);
                 // cleanupJobs[1] = defines.Dispose(handle);
