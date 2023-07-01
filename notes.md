@@ -1,7 +1,7 @@
 # Installation
 
 - Open package manager UI
-- Add from git URL, then paste: `git+https://github.com/CarePackage17/com.unity.ide.vscode?path=/Packages/com.unity.ide.vscode#sdk-style`
+- Add from git URL, then paste: `git+https://github.com/CarePackage17/com.unity.ide.vscode?path=/Packages/com.cp17.ide.vscode#sdk-style`
 
 # TODO
 
