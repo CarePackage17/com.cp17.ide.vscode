@@ -162,7 +162,7 @@ namespace VSCodeEditor
                 | ProjectGenerationFlag.Unknown);
         }
 
-        readonly string m_ProjectName;
+        readonly string m_unityProjectName;
         readonly IAssemblyNameProvider m_AssemblyNameProvider;
         readonly IFileIO m_FileIOProvider;
         readonly IGUIDGenerator m_GUIDProvider;
@@ -173,7 +173,7 @@ namespace VSCodeEditor
         public ProjectGeneration(string tempDirectory, IAssemblyNameProvider assemblyNameProvider, IFileIO fileIO, IGUIDGenerator guidGenerator)
         {
             ProjectDirectory = tempDirectory.NormalizePath();
-            m_ProjectName = Path.GetFileName(ProjectDirectory);
+            m_unityProjectName = Path.GetFileName(ProjectDirectory);
             m_AssemblyNameProvider = assemblyNameProvider;
             m_FileIOProvider = fileIO;
             m_GUIDProvider = guidGenerator;
@@ -1027,7 +1027,7 @@ namespace VSCodeEditor
 
         public string SolutionFile()
         {
-            return Path.Combine(ProjectDirectory, $"{m_ProjectName}.sln");
+            return Path.Combine(ProjectDirectory, $"{m_unityProjectName}.sln");
         }
 
         //I wonder if it's faster to use hashset vs fucking around with arrays + maybe
@@ -1274,7 +1274,7 @@ namespace VSCodeEditor
 
         string ProjectGuid(string assembly)
         {
-            return m_GUIDProvider.ProjectGuid(m_ProjectName, assembly);
+            return m_GUIDProvider.ProjectGuid(m_unityProjectName, assembly);
         }
 
         static string ProjectFooter()
