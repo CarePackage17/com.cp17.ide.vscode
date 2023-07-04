@@ -207,9 +207,7 @@ struct GenerateProjectJob : IJob
                 pathUtf8.Length = destLen;
             }
 
-            //decimal 47 is '/'
-            //https://en.wikipedia.org/wiki/List_of_Unicode_characters#Basic_Latin
-            FixedString32Bytes separator = new(new Unicode.Rune(47));
+            FixedString32Bytes separator = new(new Unicode.Rune('/'));
 
             int lastSeparatorIndex = -1;
             unsafe
