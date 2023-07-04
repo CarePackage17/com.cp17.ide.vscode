@@ -52,7 +52,8 @@ namespace VSCodeEditor
         static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
         static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
         static ProfilerMarker s_excludedAssemblyMarker = new($"{nameof(GetExcludedAssemblies)}");
-        static ProfilerMarker s_mainAssemblyGenMarker = new("MainAssemblyGeneration");
+        static ProfilerMarker s_setupJobsMarker = new("SetupJobs");
+        static ProfilerMarker s_completeAndDisposeMarker = new("CompleteAndDisposeAllTheThings");
         static ProfilerMarker s_slnGenMarker = new("SlnGeneration");
 
         //These don't change at runtime, so we can cache them once and use them forever.
@@ -390,7 +391,7 @@ namespace VSCodeEditor
             StringBuilder sb = new(capacity: 4096);
             sb.AppendLine("Excluded assembles:");
 
-            s_mainAssemblyGenMarker.Begin();
+            s_setupJobsMarker.Begin();
 
             for (int i = 0; i < assemblies.Length; i++)
             {
@@ -533,7 +534,9 @@ namespace VSCodeEditor
                 }
             }
 
-            s_mainAssemblyGenMarker.End();
+            s_setupJobsMarker.End();
+
+            s_completeAndDisposeMarker.Begin();
 
             //complete all the jobs, dispose all the things
             foreach ((JobHandle handle, var jobData) in jobList)
@@ -547,6 +550,7 @@ namespace VSCodeEditor
                 jobData.projectXmlOutput.Dispose();
             }
             excludedAssemblies.Dispose();
+            s_completeAndDisposeMarker.End();
 
             Debug.Log(sb.ToString());
 

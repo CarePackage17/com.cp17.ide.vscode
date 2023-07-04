@@ -6,6 +6,8 @@ using System;
 using Unity.Collections.LowLevel.Unsafe;
 using System.Runtime.InteropServices;
 using VSCodeEditor;
+using System.Security.Cryptography;
+using System.Text;
 
 struct ProjectReference
 {
@@ -83,11 +85,13 @@ struct PrepareDataJob : IJob
             //These references contain ones that are set up via asmdef -> we want a project reference
             //here (unless it's from a source the user excluded in settings).
             int refIndex = 0;
+            using var mD5 = MD5CryptoServiceProvider.Create();
             foreach (var assembly in maybeAsmdefReferences)
             {
                 //This is a bit different in that is doesn't use ProjectGuid like the old code did...
                 //Anyway, this is sort of
-                projectReferences[refIndex] = new(assembly.name, SolutionGuidGenerator.GuidForProject(assembly.name));
+                var hash = mD5.ComputeHash(Encoding.Default.GetBytes(assembly.name + "salt"));
+                projectReferences[refIndex] = new(assembly.name, new Guid(hash).ToString());
                 refIndex++;
             }
         }
