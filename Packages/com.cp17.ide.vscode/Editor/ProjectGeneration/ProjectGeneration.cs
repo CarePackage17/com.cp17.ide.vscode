@@ -195,11 +195,6 @@ namespace VSCodeEditor
         /// </param>
         public bool SyncIfNeeded(List<string> affectedFiles, string[] reimportedFiles)
         {
-            string affected = string.Join(',', affectedFiles);
-            string reimported = string.Join(',', reimportedFiles);
-
-            Debug.Log($"{nameof(SyncIfNeeded)} called with affectedFiles: {affected}, reimportedFiles: {reimported}");
-
             if (affectedFiles.Count > 0 || reimportedFiles.Length > 0)
             {
                 JobifiedSync();

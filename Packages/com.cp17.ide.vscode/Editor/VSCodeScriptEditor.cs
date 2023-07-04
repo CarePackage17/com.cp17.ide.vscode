@@ -172,6 +172,13 @@ namespace VSCodeEditor
 
         public void SyncIfNeeded(string[] addedFiles, string[] deletedFiles, string[] movedFiles, string[] movedFromFiles, string[] importedFiles)
         {
+            string added = string.Join(',', addedFiles);
+            string deleted = string.Join(',', deletedFiles);
+            string moved = string.Join(',', movedFiles);
+            string movedFrom = string.Join(',', movedFromFiles);
+            string imported = string.Join(',', importedFiles);
+
+            UnityEngine.Debug.Log($"{nameof(SyncIfNeeded)} called with addedFiles: {added}, deletedFiles: {deleted}, movedFiles: {moved}, movedFromFiles: {movedFrom}, importedFiles: {imported}");
             (m_ProjectGeneration.AssemblyNameProvider as IPackageInfoCache)?.ResetPackageInfoCache();
 
             m_affectedFiles.Clear();
