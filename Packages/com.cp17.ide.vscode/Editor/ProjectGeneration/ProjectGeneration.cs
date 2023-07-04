@@ -56,6 +56,7 @@ namespace VSCodeEditor
         static ProfilerMarker s_slnGenMarker = new("SlnGeneration");
 
         //These don't change at runtime, so we can cache them once and use them forever.
+        //We could even use a ScriptableObject so it survives domain reloads if we want...
         static string[] s_netStandardAssemblyDirectories = CompilationPipeline.GetSystemAssemblyDirectories(ApiCompatibilityLevel.NET_Standard);
         static string[] s_net48AssemblyDirectories = CompilationPipeline.GetSystemAssemblyDirectories(ApiCompatibilityLevel.NET_Unity_4_8);
 
@@ -429,21 +430,15 @@ namespace VSCodeEditor
                     projectDirectoryStringHandle = GCHandle.Alloc(ProjectDirectory),
                     compiledAssemblyRefsHandle = GCHandle.Alloc(compiledAssemblyRefs),
                     definesArrayHandle = GCHandle.Alloc(csDefines),
+                    assembliesArrayHandle = GCHandle.Alloc(maybeAsmdefReferences),
+                    unityProjectNameHandle = GCHandle.Alloc(m_unityProjectName),
+                    projectReferences = projectReferences,
                     definesUtf16 = definesUtf16,
                     assemblyReferencePathsUtf16 = assemblyReferencePathsUtf16,
                     sourceFilesUtf16 = sourceFilesUtf16
                 };
 
                 JobHandle prepJobHandle = prepJob.Schedule();
-
-                //These references contain ones that are set up via asmdef -> we want a project reference
-                //here (unless it's from a source the user excluded in settings).
-                int refIndex = 0;
-                foreach (Assembly a in maybeAsmdefReferences)
-                {
-                    projectReferences[refIndex] = new(a.name, ProjectGuid(a.name));
-                    refIndex++;
-                }
 
                 GenerateProjectJob generateJob = new()
                 {

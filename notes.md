@@ -9,6 +9,7 @@
 - ~~Move cost of string conversion (utf16 to utf8) into job so main thread doesn't drown in work~~
 - Parse stuff from response files and add into the project (nullable, extra files, compiler switches, etc.)
 - Debug `dotnet build` circular dependency when building sln (wtf?)
+- Figure out how `SyncIfNeeded` is supposed to work because it doesn't look like Unity tells us when a source file is added/deleted, oof
 - Clean up code (it's pretty ugly rn)
 - Test on Windows
 - Test with bigger projects and more assemblies. Maybe Unity's sample stuff on github for starters.

@@ -25,6 +25,8 @@ struct PrepareDataJob : IJob
     [ReadOnly] public GCHandle projectDirectoryStringHandle;
     [ReadOnly] public GCHandle compiledAssemblyRefsHandle;
     [ReadOnly] public GCHandle definesArrayHandle;
+    [ReadOnly] public GCHandle assembliesArrayHandle;
+    [ReadOnly] public GCHandle unityProjectNameHandle;
 
     [WriteOnly]
     public NativeList<UnsafeList<char>> sourceFilesUtf16;
@@ -35,12 +37,16 @@ struct PrepareDataJob : IJob
     [WriteOnly]
     public NativeList<UnsafeList<char>> definesUtf16;
 
+    [WriteOnly]
+    public NativeArray<ProjectReference> projectReferences;
+
     public void Execute()
     {
         var csSourceFiles = pathArrayHandle.Target as string[];
         var compiledAssemblyRefs = compiledAssemblyRefsHandle.Target as string[];
         var csDefines = definesArrayHandle.Target as string[];
         var projectDirectory = projectDirectoryStringHandle.Target as string;
+        var maybeAsmdefReferences = assembliesArrayHandle.Target as UnityEditor.Compilation.Assembly[];
 
         try
         {
@@ -73,6 +79,17 @@ struct PrepareDataJob : IJob
                 UnsafeList<char> utf16Path = relativeToProject.ToUnsafeList(Allocator.TempJob);
                 sourceFilesUtf16.Add(utf16Path);
             }
+
+            //These references contain ones that are set up via asmdef -> we want a project reference
+            //here (unless it's from a source the user excluded in settings).
+            int refIndex = 0;
+            foreach (var assembly in maybeAsmdefReferences)
+            {
+                //This is a bit different in that is doesn't use ProjectGuid like the old code did...
+                //Anyway, this is sort of
+                projectReferences[refIndex] = new(assembly.name, SolutionGuidGenerator.GuidForProject(assembly.name));
+                refIndex++;
+            }
         }
         finally
         {
@@ -80,6 +97,8 @@ struct PrepareDataJob : IJob
             projectDirectoryStringHandle.Free();
             compiledAssemblyRefsHandle.Free();
             definesArrayHandle.Free();
+            assembliesArrayHandle.Free();
+            unityProjectNameHandle.Free();
         }
     }
 }
