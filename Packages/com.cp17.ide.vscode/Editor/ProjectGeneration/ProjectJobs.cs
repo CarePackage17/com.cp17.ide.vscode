@@ -44,11 +44,11 @@ struct PrepareDataJob : IJob
 
     public void Execute()
     {
-        var csSourceFiles = pathArrayHandle.Target as string[];
-        var compiledAssemblyRefs = compiledAssemblyRefsHandle.Target as string[];
-        var csDefines = definesArrayHandle.Target as string[];
+        var csSourceFiles = (string[])pathArrayHandle.Target;
+        var compiledAssemblyRefs = (string[])compiledAssemblyRefsHandle.Target;
+        var csDefines = (string[])definesArrayHandle.Target;
         var projectDirectory = projectDirectoryStringHandle.Target as string;
-        var maybeAsmdefReferences = assembliesArrayHandle.Target as UnityEditor.Compilation.Assembly[];
+        var maybeAsmdefReferences = (UnityEditor.Compilation.Assembly[])assembliesArrayHandle.Target;
 
         try
         {
