@@ -55,9 +55,12 @@ struct PrepareDataJob : IJob
             //The references we get here are full paths to dll files.
             //For reference items in SDK-style MSBuild we just need the module names without the dll extension, but
             //the directory it's in needs to be added to the search path.
+            //NOTE: On Windows we get paths with backslashes (\), but we want forward slashes in the project file, so
+            //we do an extra replace step.
             foreach (string reference in compiledAssemblyRefs)
             {
-                UnsafeList<char> assemblyReferencePathUtf16 = reference.ToUnsafeList(Allocator.TempJob);
+                string refPathWithForwardSlashes = reference.Replace('\\', '/');
+                UnsafeList<char> assemblyReferencePathUtf16 = refPathWithForwardSlashes.ToUnsafeList(Allocator.TempJob);
                 assemblyReferencePathsUtf16.Add(assemblyReferencePathUtf16);
             }
 
@@ -75,7 +78,7 @@ struct PrepareDataJob : IJob
                 //For source files we need paths relative to project directory and luckily Path.GetRelativePath calls
                 //GetFullPath internally, so we don't need to (less GC allocs?)
                 //https://learn.microsoft.com/en-us/dotnet/api/system.io.path.getrelativepath?view=netstandard-2.1#remarks
-                string relativeToProject = Path.GetRelativePath(projectDirectory, filePath);
+                string relativeToProject = Path.GetRelativePath(projectDirectory, filePath).Replace('\\', '/');
 
                 //The job should dispose this after conversion
                 UnsafeList<char> utf16Path = relativeToProject.ToUnsafeList(Allocator.TempJob);
@@ -207,7 +210,12 @@ struct GenerateProjectJob : IJob
                 pathUtf8.Length = destLen;
             }
 
+            //This explodes on Windows, but checking for \ is not enough since some paths contain both...sigh.
+            //The paths unity provides for package manager cs files for example contain forward slashes.
+            //Path.GetFullPath changes those to backslashes and we have cases that contain both so we might need to check both? bleh.
+            //But I guess at the end we still wanna write forward slashes for msbuild, don't we? Let's see if we can replace all the back slashes.
             FixedString32Bytes separator = new(new Unicode.Rune('/'));
+            //FixedString32Bytes separator = new(new Unicode.Rune('\\'));
 
             int lastSeparatorIndex = -1;
             unsafe
