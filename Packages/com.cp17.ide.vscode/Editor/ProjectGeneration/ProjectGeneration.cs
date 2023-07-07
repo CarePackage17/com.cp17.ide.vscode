@@ -360,7 +360,7 @@ namespace VSCodeEditor
 
             //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
             //generated for them (excluded by user setting).
-            string scriptAssembliesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies"));
+            string scriptAssembliesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies")).Replace('\\', '/');
             FixedString4096Bytes scriptAssembliesPathFixed = new(scriptAssembliesPath);
             string[] systemReferenceDirs;
 
