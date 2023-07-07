@@ -10,8 +10,10 @@
 - Parse stuff from response files and add into the project (nullable, extra files, compiler switches, etc.)
 - Debug `dotnet build` circular dependency when building sln (wtf?)
 - Figure out how `SyncIfNeeded` is supposed to work because it doesn't look like Unity tells us when a source file is added/deleted, oof
+  - Maybe a linux bug, on Windows it does tell me at least in the added/deleted cases
 - Clean up code (it's pretty ugly rn)
-- Test on Windows
+- ~~Test on Windows~~
+  - Works after fixing some of the path separator BS, but should probably have regression tests at least
 - Test with bigger projects and more assemblies. Maybe Unity's sample stuff on github for starters.
   - Also test on shitty hardware
   - URP template and boss room (https://github.com/Unity-Technologies/com.unity.multiplayer.samples.coop/releases) work fine so far
