@@ -52,6 +52,7 @@ namespace VSCodeEditor
         static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
         static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
         static ProfilerMarker s_excludedAssemblyMarker = new($"{nameof(GetExcludedAssemblies)}");
+        static ProfilerMarker s_getDataMarker = new("GetDataFromUnity");
         static ProfilerMarker s_setupJobsMarker = new("SetupJobs");
         static ProfilerMarker s_completeAndDisposeMarker = new("CompleteAndDisposeAllTheThings");
         static ProfilerMarker s_slnGenMarker = new("SlnGeneration");
@@ -165,6 +166,7 @@ namespace VSCodeEditor
         }
 
         readonly string m_unityProjectName;
+        readonly string m_scriptAssembliesPath;
         readonly IAssemblyNameProvider m_AssemblyNameProvider;
         readonly IFileIO m_FileIOProvider;
         readonly IGUIDGenerator m_GUIDProvider;
@@ -175,6 +177,7 @@ namespace VSCodeEditor
         public ProjectGeneration(string tempDirectory, IAssemblyNameProvider assemblyNameProvider, IFileIO fileIO, IGUIDGenerator guidGenerator)
         {
             ProjectDirectory = tempDirectory.NormalizePath();
+            m_scriptAssembliesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies")).Replace('\\', '/');
             m_unityProjectName = Path.GetFileName(ProjectDirectory);
             m_AssemblyNameProvider = assemblyNameProvider;
             m_FileIOProvider = fileIO;
@@ -358,10 +361,10 @@ namespace VSCodeEditor
             s_jobifiedSyncMarker.Begin();
             // Debug.Log($"Running {nameof(JobifiedSync)}");
 
+            s_getDataMarker.Begin();
             //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
             //generated for them (excluded by user setting).
-            string scriptAssembliesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies")).Replace('\\', '/');
-            FixedString4096Bytes scriptAssembliesPathFixed = new(scriptAssembliesPath);
+            FixedString4096Bytes scriptAssembliesPathFixed = new(m_scriptAssembliesPath);
             string[] systemReferenceDirs;
 
             AssembliesType assembliesType = AssembliesType.Editor;
@@ -371,7 +374,7 @@ namespace VSCodeEditor
 
             //This generates a lot of garbage, but it's the only way to get this data as of 2021 LTS.
             Assembly[] assemblies = CompilationPipeline.GetAssemblies(assembliesType);
-
+s_getDataMarker.End();
             //We can definitely cache this too, user settings change doesn't happen often usually.
             NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies = new(assemblies.Length, Allocator.TempJob);
             GetExcludedAssemblies(assemblies, excludedAssemblies);
