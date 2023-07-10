@@ -401,7 +401,7 @@ struct GenerateProjectJob : IJob
 
         if (nullableContext.IsEmpty)
         {
-            nullableContext = "disabled";
+            nullableContext = "disable";
         }
 
         FixedString4096Bytes propertyGroupFormatString = "<PropertyGroup>\n" +
