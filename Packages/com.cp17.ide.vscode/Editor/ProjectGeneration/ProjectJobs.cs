@@ -30,17 +30,10 @@ struct PrepareDataJob : IJob
     [ReadOnly] public GCHandle assembliesArrayHandle;
     [ReadOnly] public GCHandle unityProjectNameHandle;
 
-    [WriteOnly]
-    public NativeList<UnsafeList<char>> sourceFilesUtf16;
-
-    [WriteOnly]
-    public NativeList<UnsafeList<char>> assemblyReferencePathsUtf16;
-
-    [WriteOnly]
-    public NativeList<UnsafeList<char>> definesUtf16;
-
-    [WriteOnly]
-    public NativeArray<ProjectReference> projectReferences;
+    [WriteOnly] public NativeList<UnsafeList<char>> sourceFilesUtf16;
+    [WriteOnly] public NativeList<UnsafeList<char>> assemblyReferencePathsUtf16;
+    [WriteOnly] public NativeList<UnsafeList<char>> definesUtf16;
+    [WriteOnly] public NativeArray<ProjectReference> projectReferences;
 
     public void Execute()
     {
@@ -383,28 +376,6 @@ struct GenerateProjectJob : IJob
     }
 }
 
-//TODO: Copy whatever Mono does for path manipulation and make it work with unity native strings instead.
-static class Temp
-{
-    //Copied from Mono in Unity 2021.3:
-    //https://github.com/Unity-Technologies/mono/blob/d20b7310dcfd02edb5c6963b218a8405b92702d7/mcs/class/corlib/System.IO/Path.cs#L626
-    static char[] PathSeparatorChars = new[] { Path.PathSeparator, Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
-    static int findExtension(string path)
-    {
-        // method should return the index of the path extension
-        // start or -1 if no valid extension
-        if (path != null)
-        {
-            int iLastDot = path.LastIndexOf('.');
-            int iLastSep = path.LastIndexOfAny(PathSeparatorChars);
-
-            if (iLastDot > iLastSep)
-                return iLastDot;
-        }
-        return -1;
-    }
-}
-
 struct WriteToFileJob : IJob
 {
     [ReadOnly] public NativeText content;
@@ -412,6 +383,7 @@ struct WriteToFileJob : IJob
 
     public void Execute()
     {
+        //Unfortunately there's no write equivalent to AsyncReadManager, so this needs to be a non-bursted job.
         using (FileStream fs = File.Open(filePath.ConvertToString(), FileMode.Create, FileAccess.Write))
         {
             ReadOnlySpan<byte> data;
