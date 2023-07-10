@@ -115,6 +115,7 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public NativeList<UnsafeList<char>> definesUtf16;
     [ReadOnly] public NativeList<UnsafeList<char>> sourceFilesUtf16;
     [ReadOnly] public NativeList<UnsafeList<char>> assemblyReferencePathsUtf16;
+    [ReadOnly] public NativeList<UnsafeList<char>> extraAssemblyReferencePathsUtf16;
     [ReadOnly] public FixedString4096Bytes scriptAssembliesPath;
     [ReadOnly] public NativeArray<ProjectReference> projectReferences;
     [ReadOnly] public NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies;
@@ -184,6 +185,7 @@ struct GenerateProjectJob : IJob
         //From the assembly reference paths we pass in we can make an array of assembly references +
         //assembly search paths.
         NativeList<FixedString4096Bytes> assemblyReferences = new(assemblyReferencePathsUtf16.Length, Allocator.Temp);
+        NativeList<FixedString4096Bytes> extraAssemblyReferences = new(extraAssemblyReferencePathsUtf16.Length, Allocator.Temp);
         NativeList<FixedString4096Bytes> searchPaths = new(256, Allocator.Temp);
         NativeList<int> searchPathHashes = new(256, Allocator.Temp);
 
@@ -246,6 +248,67 @@ struct GenerateProjectJob : IJob
             }
 
             referenceItems.AppendFormat(referenceFormatString, assemblyReferences[i]);
+        }
+
+        //TODO: extract method so it's less ugly
+        for (int i = 0; i < extraAssemblyReferencePathsUtf16.Length; i++)
+        {
+            pathUtf8.Clear();
+            using UnsafeList<char> pathUtf16 = extraAssemblyReferencePathsUtf16[i];
+            unsafe
+            {
+                byte* destPtr = pathUtf8.GetUnsafePtr();
+                CopyError err = UTF8ArrayUnsafeUtility.Copy(destPtr, out int destLen, pathUtf8.Capacity, pathUtf16.Ptr, pathUtf16.Length);
+
+                //do we really need to do this ourselves?
+                //probably because unsafe whatever doesn't do shit for us. I guess that means all the other copies only worked on the
+                //retry path? what? debug this.
+                pathUtf8.Length = destLen;
+            }
+
+
+            //This explodes on Windows, but checking for \ is not enough since some paths contain both...sigh.
+            //The paths unity provides for package manager cs files for example contain forward slashes.
+            //Path.GetFullPath changes those to backslashes and we have cases that contain both so we might need to check both? bleh.
+            //But I guess at the end we still wanna write forward slashes for msbuild, don't we? Let's see if we can replace all the back slashes.
+            FixedString32Bytes separator = new(new Unicode.Rune('/'));
+            //FixedString32Bytes separator = new(new Unicode.Rune('\\'));
+
+            int lastSeparatorIndex = -1;
+            unsafe
+            {
+                lastSeparatorIndex = pathUtf8.LastIndexOf(separator);
+
+                if (lastSeparatorIndex != -1)
+                {
+                    //get substrings for path and filename
+                    FixedString512Bytes fileName = new(new Unicode.Rune(0));
+                    //Start at 1 past the dir separator
+                    //if a path ends in a slash we're fucked because out of bounds, whoops
+                    byte* srcOffset = pathUtf8.GetUnsafePtr() + lastSeparatorIndex + 1;
+                    int charsTillEnd = pathUtf8.Length - lastSeparatorIndex - 5; //the minus 5 is for ".dll\0", we don't need that
+                    UTF8ArrayUnsafeUtility.Copy(fileName.GetUnsafePtr(), out int destLength, FixedString512Bytes.UTF8MaxLengthInBytes,
+                        srcOffset, charsTillEnd);
+                    fileName.Length = destLength;
+
+
+                    extraAssemblyReferences.Add(fileName);
+
+                    FixedString4096Bytes containingDirectory = new(new Unicode.Rune(0));
+                    srcOffset = pathUtf8.GetUnsafePtr();
+                    UTF8ArrayUnsafeUtility.Copy(containingDirectory.GetUnsafePtr(), out destLength, containingDirectory.Capacity, srcOffset, lastSeparatorIndex);
+                    containingDirectory.Length = destLength;
+
+                    int hashCode = containingDirectory.GetHashCode();
+                    if (!searchPathHashes.Contains(hashCode))
+                    {
+                        searchPathHashes.Add(hashCode);
+                        searchPaths.Add(containingDirectory);
+                    }
+                }
+            }
+
+            referenceItems.AppendFormat(referenceFormatString, extraAssemblyReferences[i]);
         }
 
         //Assembly search paths need to be concatenated with ';', like defines.

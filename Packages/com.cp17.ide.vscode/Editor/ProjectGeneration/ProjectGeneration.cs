@@ -360,6 +360,13 @@ namespace VSCodeEditor
         {
             s_jobifiedSyncMarker.Begin();
             // Debug.Log($"Running {nameof(JobifiedSync)}");
+            // var fileInfo = new Mono.Unix.UnixFileInfo("/usr/bin/code");
+            // if (fileInfo.Exists) Debug.Log("I exist!");
+            // else Debug.Log("noooo");
+            // using (var fs = File.OpenRead("/usr/bin/code"))
+            // {
+            //     Debug.Log("uh I guess I can read?");
+            // }
 
             s_getDataMarker.Begin();
             //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
@@ -420,25 +427,10 @@ namespace VSCodeEditor
                 NativeList<UnsafeList<char>> definesUtf16 = new(256, Allocator.TempJob);
                 NativeList<UnsafeList<char>> sourceFilesUtf16 = new(1024, Allocator.TempJob);
                 NativeList<UnsafeList<char>> assemblyReferencePathsUtf16 = new(512, Allocator.TempJob);
+                NativeList<UnsafeList<char>> extraAssemblyReferencePathsUtf16 = new(8, Allocator.TempJob);
                 FixedString32Bytes nullableContext = new();
                 NativeArray<ProjectReference> projectReferences = new(maybeAsmdefReferences.Length, Allocator.TempJob);
                 NativeText projectXmlOutput = new(32 * 1024, Allocator.TempJob);
-
-                PrepareDataJob prepJob = new()
-                {
-                    pathArrayHandle = GCHandle.Alloc(csSourceFiles),
-                    projectDirectoryStringHandle = GCHandle.Alloc(ProjectDirectory),
-                    compiledAssemblyRefsHandle = GCHandle.Alloc(compiledAssemblyRefs),
-                    definesArrayHandle = GCHandle.Alloc(csDefines),
-                    assembliesArrayHandle = GCHandle.Alloc(maybeAsmdefReferences),
-                    unityProjectNameHandle = GCHandle.Alloc(m_unityProjectName),
-                    projectReferences = projectReferences,
-                    definesUtf16 = definesUtf16,
-                    assemblyReferencePathsUtf16 = assemblyReferencePathsUtf16,
-                    sourceFilesUtf16 = sourceFilesUtf16
-                };
-
-                JobHandle prepJobHandle = prepJob.Schedule();
 
                 //references and defines that are in here need to be parsed out, otherwise
                 //intellisense won't pick them up even if the compiler will (same for nullable, it
@@ -479,6 +471,11 @@ namespace VSCodeEditor
 
                     //add to references
                     string[] references = rspData.FullPathReferences;
+                    foreach (string r in references)
+                    {
+                        extraAssemblyReferencePathsUtf16.Add(r.ToUnsafeList(Allocator.TempJob));
+                    }
+
                     rspStrings.Append("Extra references: ");
                     rspStrings.Append(string.Join(", ", references));
                     rspStrings.AppendLine();
@@ -509,6 +506,22 @@ namespace VSCodeEditor
                     Debug.Log(rspStrings.ToString());
                 }
 
+                PrepareDataJob prepJob = new()
+                {
+                    pathArrayHandle = GCHandle.Alloc(csSourceFiles),
+                    projectDirectoryStringHandle = GCHandle.Alloc(ProjectDirectory),
+                    compiledAssemblyRefsHandle = GCHandle.Alloc(compiledAssemblyRefs),
+                    definesArrayHandle = GCHandle.Alloc(csDefines),
+                    assembliesArrayHandle = GCHandle.Alloc(maybeAsmdefReferences),
+                    unityProjectNameHandle = GCHandle.Alloc(m_unityProjectName),
+                    projectReferences = projectReferences,
+                    definesUtf16 = definesUtf16,
+                    assemblyReferencePathsUtf16 = assemblyReferencePathsUtf16,
+                    sourceFilesUtf16 = sourceFilesUtf16
+                };
+
+                JobHandle prepJobHandle = prepJob.Schedule();
+
                 GenerateProjectJob generateJob = new()
                 {
                     assemblyName = new(assembly.name),
@@ -516,6 +529,7 @@ namespace VSCodeEditor
                     sourceFilesUtf16 = sourceFilesUtf16,
                     scriptAssembliesPath = scriptAssembliesPathFixed,
                     assemblyReferencePathsUtf16 = assemblyReferencePathsUtf16,
+                    extraAssemblyReferencePathsUtf16 = extraAssemblyReferencePathsUtf16,
                     projectXmlOutput = projectXmlOutput,
                     langVersion = new(langVersion),
                     unsafeCode = unsafeCode,
@@ -560,6 +574,7 @@ namespace VSCodeEditor
                 jobData.definesUtf16.Dispose();
                 jobData.sourceFilesUtf16.Dispose();
                 jobData.assemblyReferencePathsUtf16.Dispose();
+                jobData.extraAssemblyReferencePathsUtf16.Dispose();
                 jobData.projectReferences.Dispose();
                 jobData.projectXmlOutput.Dispose();
             }

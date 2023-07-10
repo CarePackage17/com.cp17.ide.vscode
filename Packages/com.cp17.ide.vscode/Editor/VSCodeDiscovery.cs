@@ -13,7 +13,7 @@ namespace VSCodeEditor
 
     public class VSCodeDiscovery : IDiscovery
     {
-        List<CodeEditor.Installation> m_Installations = new();
+        List<CodeEditor.Installation>? m_Installations;
 
         public CodeEditor.Installation[] PathCallback()
         {
@@ -58,6 +58,12 @@ namespace VSCodeEditor
             };
 #endif
             var existingPaths = possiblePaths.Where(VSCodeExists).ToList();
+
+            //So there's a problem here. This works as expected on net6.0 on Linux
+            //but not on Unity Mono (sigh). Maybe Mono.Posix can help?
+            // if (File.Exists("/usr/bin/code")) Debug.Log("Yo I exist");
+            // if (new FileInfo("/usr/bin/code").Exists) Debug.Log("Yo I exist");
+            // UnityEngine.Debug.Log($"existing paths: {string.Join('\n', existingPaths)}");
             if (!existingPaths.Any())
             {
                 return;
