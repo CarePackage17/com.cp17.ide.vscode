@@ -125,6 +125,7 @@ struct GenerateProjectJob : IJob
     [ReadOnly] public FixedString4096Bytes scriptAssembliesPath;
     [ReadOnly] public NativeArray<ProjectReference> projectReferences;
     [ReadOnly] public NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies;
+    [ReadOnly] public FixedString32Bytes nullableContext;
 
     public NativeText projectXmlOutput;
 
@@ -342,6 +343,11 @@ struct GenerateProjectJob : IJob
         FixedString64Bytes projectElement = "<Project Sdk=\"Microsoft.NET.Sdk\">\n";
         projectXmlOutput.Append(projectElement);
 
+        if (nullableContext.IsEmpty)
+        {
+            nullableContext = "disabled";
+        }
+
         FixedString4096Bytes propertyGroupFormatString = "<PropertyGroup>\n" +
                         "<TargetFramework>netstandard2.1</TargetFramework>\n" + //make this configurable as well
                         "<LangVersion>{0}</LangVersion>\n" +
@@ -353,9 +359,10 @@ struct GenerateProjectJob : IJob
                         "<AllowUnsafeBlocks>{1}</AllowUnsafeBlocks>\n" +
                         "<AssemblySearchPaths>{2}</AssemblySearchPaths>\n" +
                         "<DefineConstants>{3}</DefineConstants>\n" +
+                        "<nullable>{4}</nullable>\n" +
                     "</PropertyGroup>\n";
         FixedString32Bytes unsafeStr = unsafeCode ? "true" : "false";
-        projectXmlOutput.AppendFormat(propertyGroupFormatString, langVersion, unsafeStr, concatenatedSearchPaths, defines);
+        projectXmlOutput.AppendFormat(propertyGroupFormatString, langVersion, unsafeStr, concatenatedSearchPaths, defines, nullableContext);
 
         //compile and reference belong in an itemgroup
         FixedString64Bytes itemGroupFormatString = "<ItemGroup>\n{0}\n{1}\n</ItemGroup>\n";

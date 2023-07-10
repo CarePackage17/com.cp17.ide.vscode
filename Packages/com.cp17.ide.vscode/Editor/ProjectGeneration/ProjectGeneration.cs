@@ -374,7 +374,7 @@ namespace VSCodeEditor
 
             //This generates a lot of garbage, but it's the only way to get this data as of 2021 LTS.
             Assembly[] assemblies = CompilationPipeline.GetAssemblies(assembliesType);
-s_getDataMarker.End();
+            s_getDataMarker.End();
             //We can definitely cache this too, user settings change doesn't happen often usually.
             NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies = new(assemblies.Length, Allocator.TempJob);
             GetExcludedAssemblies(assemblies, excludedAssemblies);
@@ -420,6 +420,7 @@ s_getDataMarker.End();
                 NativeList<UnsafeList<char>> definesUtf16 = new(256, Allocator.TempJob);
                 NativeList<UnsafeList<char>> sourceFilesUtf16 = new(1024, Allocator.TempJob);
                 NativeList<UnsafeList<char>> assemblyReferencePathsUtf16 = new(512, Allocator.TempJob);
+                FixedString32Bytes nullableContext = new();
                 NativeArray<ProjectReference> projectReferences = new(maybeAsmdefReferences.Length, Allocator.TempJob);
                 NativeText projectXmlOutput = new(32 * 1024, Allocator.TempJob);
 
@@ -438,43 +439,6 @@ s_getDataMarker.End();
                 };
 
                 JobHandle prepJobHandle = prepJob.Schedule();
-
-                GenerateProjectJob generateJob = new()
-                {
-                    assemblyName = new(assembly.name),
-                    definesUtf16 = definesUtf16,
-                    sourceFilesUtf16 = sourceFilesUtf16,
-                    scriptAssembliesPath = scriptAssembliesPathFixed,
-                    assemblyReferencePathsUtf16 = assemblyReferencePathsUtf16,
-                    projectXmlOutput = projectXmlOutput,
-                    langVersion = new(langVersion),
-                    unsafeCode = unsafeCode,
-                    projectReferences = projectReferences,
-                    excludedAssemblies = excludedAssemblies,
-                };
-
-                WriteToFileJob writeJob = new()
-                {
-                    content = projectXmlOutput,
-                    filePath = new FixedString4096Bytes(Path.Combine(ProjectDirectory, $"{assembly.name}.csproj"))
-                };
-
-                var projHandle = generateJob.Schedule(prepJobHandle);
-                var handle = writeJob.Schedule(projHandle);
-
-                //Unfortunately, Dispose(JobHandle) seems to be broken for NativeText :(
-                //Let's see if Unity fixes it.
-                //https://issuetracker.unity3d.com/issues/burst-collections-nullreferenceexceptions-thrown-when-using-nativetext-dot-dispose-jobhandle
-                // NativeArray<JobHandle> cleanupJobs = new(6, Allocator.Temp);
-                // cleanupJobs[0] = assemblyReferences.Dispose(handle);
-                // cleanupJobs[1] = defines.Dispose(handle);
-                // cleanupJobs[2] = sourceFilesUtf16.Dispose(projHandle);
-                // cleanupJobs[3] = searchPaths.Dispose(projHandle);
-                // cleanupJobs[4] = projectReferences.Dispose(handle);
-                // cleanupJobs[5] = projectTextOutput.Dispose(handle);
-                // JobHandle cleanupHandle = JobHandle.CombineDependencies(cleanupJobs);
-
-                jobList.Add((handle, generateJob));
 
                 //references and defines that are in here need to be parsed out, otherwise
                 //intellisense won't pick them up even if the compiler will (same for nullable, it
@@ -527,9 +491,61 @@ s_getDataMarker.End();
                     rspStrings.Append(string.Join(", ", otherArgs));
                     rspStrings.AppendLine();
 
+                    foreach (string arg in otherArgs)
+                    {
+                        var withoutSwitch = arg.AsSpan()[1..];
+                        if (withoutSwitch.StartsWith("nullable".AsSpan()))
+                        {
+                            int colonIndex = withoutSwitch.IndexOf(':');
+                            if (colonIndex != -1)
+                            {
+                                //ugh, please unity make it possible to init from span. please.
+                                nullableContext = withoutSwitch[(colonIndex + 1)..].ToString();
+                            }
+                        }
+                    }
+
                     //TODO: add path to rsp file into csproj as well so compiler picks it up (only 1st though)
                     Debug.Log(rspStrings.ToString());
                 }
+
+                GenerateProjectJob generateJob = new()
+                {
+                    assemblyName = new(assembly.name),
+                    definesUtf16 = definesUtf16,
+                    sourceFilesUtf16 = sourceFilesUtf16,
+                    scriptAssembliesPath = scriptAssembliesPathFixed,
+                    assemblyReferencePathsUtf16 = assemblyReferencePathsUtf16,
+                    projectXmlOutput = projectXmlOutput,
+                    langVersion = new(langVersion),
+                    unsafeCode = unsafeCode,
+                    projectReferences = projectReferences,
+                    excludedAssemblies = excludedAssemblies,
+                    nullableContext = nullableContext
+                };
+
+                WriteToFileJob writeJob = new()
+                {
+                    content = projectXmlOutput,
+                    filePath = new FixedString4096Bytes(Path.Combine(ProjectDirectory, $"{assembly.name}.csproj"))
+                };
+
+                var projHandle = generateJob.Schedule(prepJobHandle);
+                var handle = writeJob.Schedule(projHandle);
+
+                //Unfortunately, Dispose(JobHandle) seems to be broken for NativeText :(
+                //Let's see if Unity fixes it.
+                //https://issuetracker.unity3d.com/issues/burst-collections-nullreferenceexceptions-thrown-when-using-nativetext-dot-dispose-jobhandle
+                // NativeArray<JobHandle> cleanupJobs = new(6, Allocator.Temp);
+                // cleanupJobs[0] = assemblyReferences.Dispose(handle);
+                // cleanupJobs[1] = defines.Dispose(handle);
+                // cleanupJobs[2] = sourceFilesUtf16.Dispose(projHandle);
+                // cleanupJobs[3] = searchPaths.Dispose(projHandle);
+                // cleanupJobs[4] = projectReferences.Dispose(handle);
+                // cleanupJobs[5] = projectTextOutput.Dispose(handle);
+                // JobHandle cleanupHandle = JobHandle.CombineDependencies(cleanupJobs);
+
+                jobList.Add((handle, generateJob));
             }
 
             s_setupJobsMarker.End();
