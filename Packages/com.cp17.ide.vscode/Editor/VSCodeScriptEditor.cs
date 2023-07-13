@@ -74,6 +74,8 @@ namespace VSCodeEditor
 
         public bool TryGetInstallationForPath(string editorPath, out CodeEditor.Installation installation)
         {
+            UnityEngine.Debug.Log($"TryGetInstallationForPath called with {editorPath}");
+            
             var lowerCasePath = editorPath.ToLower();
             var filename = Path.GetFileName(lowerCasePath).Replace(" ", "");
             var installations = Installations;
