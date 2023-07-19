@@ -48,9 +48,9 @@ namespace VSCodeEditor
 
     public class ProjectGeneration : IGenerator
     {
-        static ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
-        static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
-        static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
+        static ProfilerMarker s_syncMarker = new($"{nameof(NewEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
+        static ProfilerMarker s_genMarker = new($"{nameof(NewEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
+        static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(NewEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
         static ProfilerMarker s_excludedAssemblyMarker = new($"{nameof(GetExcludedAssemblies)}");
         static ProfilerMarker s_getDataMarker = new("GetDataFromUnity");
         static ProfilerMarker s_setupJobsMarker = new("SetupJobs");
@@ -368,20 +368,24 @@ namespace VSCodeEditor
             //     Debug.Log("uh I guess I can read?");
             // }
 
-            s_getDataMarker.Begin();
+            string[] systemReferenceDirs;
+            Assembly[] assemblies;
             //ScriptAssemblies folder is necessary for Unity-built assemblies that do not have projects
             //generated for them (excluded by user setting).
             FixedString4096Bytes scriptAssembliesPathFixed = new(m_scriptAssembliesPath);
-            string[] systemReferenceDirs;
 
-            AssembliesType assembliesType = AssembliesType.Editor;
-            //TODO: check settings and pass AssembliesType.Player if the user selected that
-            //here's how rider does it:
-            //https://github.com/needle-mirror/com.unity.ide.rider/blob/master/Rider/Editor/ProjectGeneration/AssemblyNameProvider.cs#L56
+            using (s_getDataMarker.Auto())
+            {
+                AssembliesType assembliesType = AssembliesType.Editor;
+                //TODO: check settings and pass AssembliesType.Player if the user selected that
+                //here's how rider does it:
+                //https://github.com/needle-mirror/com.unity.ide.rider/blob/master/Rider/Editor/ProjectGeneration/AssemblyNameProvider.cs#L56
 
-            //This generates a lot of garbage, but it's the only way to get this data as of 2021 LTS.
-            Assembly[] assemblies = CompilationPipeline.GetAssemblies(assembliesType);
-            s_getDataMarker.End();
+                //This generates a lot of garbage, but it's the only way to get this data as of 2021 LTS.
+                assemblies = CompilationPipeline.GetAssemblies(assembliesType);
+            }
+
+
             //We can definitely cache this too, user settings change doesn't happen often usually.
             NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies = new(assemblies.Length, Allocator.TempJob);
             GetExcludedAssemblies(assemblies, excludedAssemblies);

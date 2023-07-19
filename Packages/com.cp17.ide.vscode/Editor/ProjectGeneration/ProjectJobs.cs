@@ -103,6 +103,31 @@ struct PrepareDataJob : IJob
     }
 }
 
+struct GenerateProjectParallelJob : IJobParallelFor
+{
+    //It could work like this:
+    //- put everything in a single collection
+    //- use ranges and indices to get data meant for a specific assembly
+    [ReadOnly] public NativeArray<FixedString4096Bytes> assemblyNames;
+    [ReadOnly] public NativeArray<FixedString64Bytes> langVersions;
+    [ReadOnly] public NativeArray<bool> unsafeCode;
+    [ReadOnly] public NativeList<UnsafeList<char>> definesUtf16;
+    [ReadOnly] public NativeList<Range> definesRange;
+    [ReadOnly] public NativeList<UnsafeList<char>> sourceFilesUtf16;
+    [ReadOnly] public NativeList<Range> sourceFilesRange;
+    [ReadOnly] public NativeList<UnsafeList<char>> assemblyReferencePathsUtf16;
+    [ReadOnly] public NativeList<Range> assemblyReferencePathsRange;
+    [ReadOnly] public FixedString4096Bytes scriptAssembliesPath;
+    [ReadOnly] public NativeArray<ProjectReference> projectReferences;
+    [ReadOnly] public NativeArray<Range> projectReferencesRange;
+    [ReadOnly] public NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies;
+    
+    public void Execute(int index)
+    {
+        throw new NotImplementedException();
+    }
+}
+
 //DisposeSentinel takes some time in editor and we don't want users to fiddle with their settings to get better
 //perf. For debugging we can still force on, but disabling safety checks via attribute should shave off
 //some time here.
