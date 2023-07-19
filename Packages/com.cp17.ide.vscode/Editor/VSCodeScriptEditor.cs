@@ -13,11 +13,6 @@ namespace VSCodeEditor
     [InitializeOnLoad]
     class NewEditor : IExternalCodeEditor
     {
-        static readonly string[] KnownVsCodeInstallPaths = new[]
-        {
-            "/bin/code",
-            "/usr/bin/code"
-        };
         static readonly string UnityProjectPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
 
         List<CodeEditor.Installation> _installations = new();
@@ -39,19 +34,7 @@ namespace VSCodeEditor
             _projectGenerator.OnlyJobified = true;
             _projectGenerator.GenerateAll(true);
 
-            //Discover VSCode installs
-            foreach (string path in KnownVsCodeInstallPaths)
-            {
-                if (File.Exists(path))
-                {
-                    CodeEditor.Installation installation = new()
-                    {
-                        Name = $"New VSCode ({path})",
-                        Path = path
-                    };
-                    _installations.Add(installation);
-                }
-            }
+            Discovery.DiscoverVsCodeInstalls(_installations);
         }
 
         //This may not be null, otherwise the preferences window is fucked
@@ -146,6 +129,65 @@ namespace VSCodeEditor
             };
 
             return false;
+        }
+    }
+
+    static class Discovery
+    {
+        static readonly string[] KnownVsCodeInstallFolders = new[]
+        {
+            #if UNITY_EDITOR_LINUX
+            "/bin/",
+            "/usr/bin/",
+            "/var/lib/flatpak/exports/bin/",
+            #endif
+            #if UNITY_EDITOR_WIN
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+            #endif
+            #if UNITY_EDITOR_OSX
+            "/Applications/"
+            #endif
+        };
+        static readonly string[] KnownVsCodeExecutableNames = new[]
+        {
+            #if UNITY_EDITOR_LINUX
+            "code",
+            "codium",
+            "com.visualstudio.code",
+            "com.vscodium.codium"
+            #endif
+            #if UNITY_EDITOR_WIN
+            "code.exe",
+            "code.cmd",
+            "code-insiders.cmd",
+            #endif
+            #if UNITY_EDITOR_OSX
+            "visualstudiocode.app",
+            "visualstudiocode-insiders.app",
+            "vscode.app",
+            "code.app",
+            #endif
+        };
+
+        internal static void DiscoverVsCodeInstalls(List<CodeEditor.Installation> installations)
+        {
+            foreach (string folder in KnownVsCodeInstallFolders)
+            {
+                foreach (string fileName in KnownVsCodeExecutableNames)
+                {
+                    string finalPath = Path.Combine(folder, fileName);
+                    if (File.Exists(finalPath))
+                    {
+                        CodeEditor.Installation installation = new()
+                        {
+                            Name = $"New VSCode ({finalPath})",
+                            Path = finalPath
+                        };
+                        installations.Add(installation);
+                    }
+                }
+            }
         }
     }
 
