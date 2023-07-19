@@ -6,18 +6,22 @@ using UnityEditor;
 using UnityEngine;
 using Unity.CodeEditor;
 using System.Collections.Generic;
+using System.Text;
 
 namespace VSCodeEditor
 {
     [InitializeOnLoad]
     class NewEditor : IExternalCodeEditor
     {
-        List<CodeEditor.Installation> _installations = new();
         static readonly string[] KnownVsCodeInstallPaths = new[]
         {
             "/bin/code",
             "/usr/bin/code"
         };
+        static readonly string UnityProjectPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+
+        List<CodeEditor.Installation> _installations = new();
+        ProjectGeneration _projectGenerator;
 
         static NewEditor()
         {
@@ -31,6 +35,11 @@ namespace VSCodeEditor
 
         NewEditor()
         {
+            _projectGenerator = new(UnityProjectPath);
+            _projectGenerator.OnlyJobified = true;
+            _projectGenerator.GenerateAll(true);
+
+            //Discover VSCode installs
             foreach (string path in KnownVsCodeInstallPaths)
             {
                 if (File.Exists(path))
@@ -46,13 +55,12 @@ namespace VSCodeEditor
         }
 
         //This may not be null, otherwise the preferences window is fucked
-        // public CodeEditor.Installation[] Installations => new CodeEditor.Installation[] {};
         public CodeEditor.Installation[] Installations
         {
             get
             {
                 UnityEngine.Debug.Log("Somebody asking for installations");
-                return new CodeEditor.Installation[] { };
+                return _installations.ToArray();
             }
         }
 
@@ -67,14 +75,34 @@ namespace VSCodeEditor
             // GUI.Label(new Rect(0, 0, 100, 30), "Hello");
         }
 
+        //Called when somebody double-clicks a script file (and others with extensions we handle?)
+        //or uses the "Assets > Open C# Project" menu item.
         public bool OpenProject(string filePath = "", int line = -1, int column = -1)
         {
-            UnityEngine.Debug.Log($"OpenProject called with filePath {filePath}, current editor path: {CodeEditor.CurrentEditorPath}");
+            //https://code.visualstudio.com/docs/editor/command-line#_launching-from-command-line
+            StringBuilder argsBuilder = new(UnityProjectPath);
+            if (!string.IsNullOrEmpty(filePath)) //Assets > Open C# Project will not pass a file name
+            {
+                argsBuilder.Append(' ');
+                argsBuilder.Append($"-g {filePath}");
+
+                //This happens when a user double-clicks a file path in a stack trace within the console window.
+                if (line != -1)
+                {
+                    argsBuilder.Append($":{line}");
+                }
+
+                if (column != -1)
+                {
+                    argsBuilder.Append($":{column}");
+                }
+            }
 
             //Get currently selected editor installation and open it with whatever args we get
-            return CodeEditor.OSOpenFile(CodeEditor.CurrentEditorPath, arguments: "");
-            
-            // return false;
+            // TODO: CodeEditor.ParseArgument
+            string args = argsBuilder.ToString();
+            UnityEngine.Debug.Log($"Opening editor at {CodeEditor.CurrentEditorPath} with {args}");
+            return CodeEditor.OSOpenFile(CodeEditor.CurrentEditorPath, args);
         }
 
         public void SyncAll()
@@ -82,6 +110,7 @@ namespace VSCodeEditor
             UnityEngine.Debug.Log("SyncAll called");
 
             //Generate projects/sln and other stuff
+            _projectGenerator.Sync();
         }
 
         public void SyncIfNeeded(string[] addedFiles, string[] deletedFiles, string[] movedFiles, string[] movedFromFiles, string[] importedFiles)
@@ -89,6 +118,7 @@ namespace VSCodeEditor
             UnityEngine.Debug.Log("SyncIfNeeded called");
 
             //Generate projects/sln and other stuff (if a file that affects compilation changed)
+            _projectGenerator.Sync();
         }
 
         //This will be called with all sorts of garbage that we've never encountered but unity did at some point.
@@ -108,26 +138,11 @@ namespace VSCodeEditor
                 }
             }
 
-            //Run discovery again?
-            // foreach (string path in KnownVsCodeInstallPaths)
-            // {
-            //     if (File.Exists(path))
-            //     {
-            //         installation = new()
-            //         {
-            //             Name = $"New VSCode ({path})",
-            //             Path = path
-            //         };
-
-            //         return true;
-            //     }
-            // }
-
-            //we need to assign something here and hope Unity doesn't use it.
+            //We need to assign something here and hope Unity doesn't use it.
             installation = new()
             {
-                Name = "Garbage",
-                Path = "/yo/mamas/house"
+                Name = "The ghost of VSCode",
+                Path = "/i/dont/really/exist/or/do/i"
             };
 
             return false;
