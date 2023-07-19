@@ -7,6 +7,7 @@ using UnityEngine;
 using Unity.CodeEditor;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace VSCodeEditor
 {
@@ -15,8 +16,9 @@ namespace VSCodeEditor
     {
         static readonly string UnityProjectPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
 
-        List<CodeEditor.Installation> _installations = new();
+        List<CodeEditor.Installation> _installations;
         ProjectGeneration _projectGenerator;
+        Task<List<CodeEditor.Installation>> _discoveryTask;
 
         static NewEditor()
         {
@@ -34,7 +36,7 @@ namespace VSCodeEditor
             _projectGenerator.OnlyJobified = true;
             _projectGenerator.GenerateAll(true);
 
-            Discovery.DiscoverVsCodeInstalls(_installations);
+            _discoveryTask = Discovery.DiscoverVsCodeInstallsAsync();
         }
 
         //This may not be null, otherwise the preferences window is fucked
@@ -111,6 +113,14 @@ namespace VSCodeEditor
         {
             UnityEngine.Debug.Log($"TryGetInstallationForPath called with {editorPath}");
 
+            //The task has been started before, but now we need the result. Since we can't change the signature of this
+            //method (part of IExternalCodeEditor) we use .Result instead of await.
+            //Not sure if this does a lot for editor interactivity; need to measure to see if it's worth the extra complexity.
+            if (_installations == null)
+            {
+                _installations = _discoveryTask.Result;
+            }
+
             //Check discovered installations from before
             foreach (var inst in _installations)
             {
@@ -121,13 +131,7 @@ namespace VSCodeEditor
                 }
             }
 
-            //We need to assign something here and hope Unity doesn't use it.
-            installation = new()
-            {
-                Name = "The ghost of VSCode",
-                Path = "/i/dont/really/exist/or/do/i"
-            };
-
+            installation = default;
             return false;
         }
     }
@@ -170,24 +174,32 @@ namespace VSCodeEditor
             #endif
         };
 
-        internal static void DiscoverVsCodeInstalls(List<CodeEditor.Installation> installations)
+        internal static Task<List<CodeEditor.Installation>> DiscoverVsCodeInstallsAsync()
         {
-            foreach (string folder in KnownVsCodeInstallFolders)
+            //This doesn't need the Unity native API, so we can run it on the thread pool.
+            return Task.Run(() =>
             {
-                foreach (string fileName in KnownVsCodeExecutableNames)
+                List<CodeEditor.Installation> installations = new();
+
+                foreach (string folder in KnownVsCodeInstallFolders)
                 {
-                    string finalPath = Path.Combine(folder, fileName);
-                    if (File.Exists(finalPath))
+                    foreach (string fileName in KnownVsCodeExecutableNames)
                     {
-                        CodeEditor.Installation installation = new()
+                        string finalPath = Path.Combine(folder, fileName);
+                        if (File.Exists(finalPath))
                         {
-                            Name = $"New VSCode ({finalPath})",
-                            Path = finalPath
-                        };
-                        installations.Add(installation);
+                            CodeEditor.Installation installation = new()
+                            {
+                                Name = $"New VSCode ({finalPath})",
+                                Path = finalPath
+                            };
+                            installations.Add(installation);
+                        }
                     }
                 }
-            }
+
+                return installations;
+            });
         }
     }
 
