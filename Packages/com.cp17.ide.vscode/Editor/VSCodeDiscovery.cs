@@ -58,12 +58,8 @@ namespace VSCodeEditor
             };
 #endif
             var existingPaths = possiblePaths.Where(VSCodeExists).ToList();
-
-            //So there's a problem here. This works as expected on net6.0 on Linux
-            //but not on Unity Mono (sigh). Maybe Mono.Posix can help?
-            // if (File.Exists("/usr/bin/code")) Debug.Log("Yo I exist");
-            // if (new FileInfo("/usr/bin/code").Exists) Debug.Log("Yo I exist");
-            // UnityEngine.Debug.Log($"existing paths: {string.Join('\n', existingPaths)}");
+            UnityEngine.Debug.Log($"Existing VSCode paths: {string.Join(',', existingPaths)}");
+            
             if (!existingPaths.Any())
             {
                 return;

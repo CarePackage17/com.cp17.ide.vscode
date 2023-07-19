@@ -10,6 +10,131 @@ using System.Collections.Generic;
 namespace VSCodeEditor
 {
     [InitializeOnLoad]
+    class NewEditor : IExternalCodeEditor
+    {
+        List<CodeEditor.Installation> _installations = new();
+        static readonly string[] KnownVsCodeInstallPaths = new[]
+        {
+            "/bin/code",
+            "/usr/bin/code"
+        };
+
+        static NewEditor()
+        {
+            UnityEngine.Debug.Log("InitializeOnLoad called us");
+
+            //Here we can create an actual instance of IExternalCodeEditor and register it, then
+            //it should show up in the UI.
+            NewEditor editor = new();
+            CodeEditor.Register(editor);
+        }
+
+        NewEditor()
+        {
+            foreach (string path in KnownVsCodeInstallPaths)
+            {
+                if (File.Exists(path))
+                {
+                    CodeEditor.Installation installation = new()
+                    {
+                        Name = $"New VSCode ({path})",
+                        Path = path
+                    };
+                    _installations.Add(installation);
+                }
+            }
+        }
+
+        //This may not be null, otherwise the preferences window is fucked
+        // public CodeEditor.Installation[] Installations => new CodeEditor.Installation[] {};
+        public CodeEditor.Installation[] Installations
+        {
+            get
+            {
+                UnityEngine.Debug.Log("Somebody asking for installations");
+                return new CodeEditor.Installation[] { };
+            }
+        }
+
+        //This is called when we're selected from the preferences window
+        public void Initialize(string editorInstallationPath)
+        {
+            UnityEngine.Debug.Log($"Initialize called with path {editorInstallationPath}");
+        }
+
+        public void OnGUI()
+        {
+            // GUI.Label(new Rect(0, 0, 100, 30), "Hello");
+        }
+
+        public bool OpenProject(string filePath = "", int line = -1, int column = -1)
+        {
+            UnityEngine.Debug.Log($"OpenProject called with filePath {filePath}, current editor path: {CodeEditor.CurrentEditorPath}");
+
+            //Get currently selected editor installation and open it with whatever args we get
+            return CodeEditor.OSOpenFile(CodeEditor.CurrentEditorPath, arguments: "");
+            
+            // return false;
+        }
+
+        public void SyncAll()
+        {
+            UnityEngine.Debug.Log("SyncAll called");
+
+            //Generate projects/sln and other stuff
+        }
+
+        public void SyncIfNeeded(string[] addedFiles, string[] deletedFiles, string[] movedFiles, string[] movedFromFiles, string[] importedFiles)
+        {
+            UnityEngine.Debug.Log("SyncIfNeeded called");
+
+            //Generate projects/sln and other stuff (if a file that affects compilation changed)
+        }
+
+        //This will be called with all sorts of garbage that we've never encountered but unity did at some point.
+        //Like any path that was ever registered and then died for example.
+        //Still haven't found a way to clear those (probably uninstalling editor, but it's not in EditorPrefs for some reason).
+        public bool TryGetInstallationForPath(string editorPath, out CodeEditor.Installation installation)
+        {
+            UnityEngine.Debug.Log($"TryGetInstallationForPath called with {editorPath}");
+
+            //Check discovered installations from before
+            foreach (var inst in _installations)
+            {
+                if (inst.Path == editorPath)
+                {
+                    installation = inst;
+                    return true;
+                }
+            }
+
+            //Run discovery again?
+            // foreach (string path in KnownVsCodeInstallPaths)
+            // {
+            //     if (File.Exists(path))
+            //     {
+            //         installation = new()
+            //         {
+            //             Name = $"New VSCode ({path})",
+            //             Path = path
+            //         };
+
+            //         return true;
+            //     }
+            // }
+
+            //we need to assign something here and hope Unity doesn't use it.
+            installation = new()
+            {
+                Name = "Garbage",
+                Path = "/yo/mamas/house"
+            };
+
+            return false;
+        }
+    }
+
+    [InitializeOnLoad]
     public class VSCodeScriptEditor : IExternalCodeEditor
     {
         const string vscode_argument = "vscode_arguments";
@@ -77,19 +202,23 @@ namespace VSCodeEditor
             var lowerCasePath = editorPath.ToLower();
             var filename = Path.GetFileName(lowerCasePath).Replace(" ", "");
             var installations = Installations;
+            bool pretending = false;
+
             if (!k_SupportedFileNames.Contains(filename))
             {
                 installation = default;
                 return false;
             }
 
-            if (!installations.Any())
+            if (/*!installations.Any()*/ installations.Length == 0)
             {
+                //uh what? if discovery finds no installation this just pretends we have one?
                 installation = new CodeEditor.Installation
                 {
                     Name = "Visual Studio Code",
                     Path = editorPath
                 };
+                pretending = true;
             }
             else
             {
@@ -104,8 +233,11 @@ namespace VSCodeEditor
                         Name = "Visual Studio Code",
                         Path = editorPath
                     };
+                    pretending = true;
                 }
             }
+
+            UnityEngine.Debug.Log($"Found VSCode installation for path {editorPath}, pretending: {pretending}");
 
             return true;
         }
@@ -116,6 +248,18 @@ namespace VSCodeEditor
             if (GUILayout.Button(k_ResetArguments, GUILayout.Width(120)))
             {
                 Arguments = DefaultArgument;
+            }
+
+            if (GUILayout.Button("Clear CodeEditor Installations", GUILayout.Width(240)))
+            {
+                var simpleton = Unity.CodeEditor.CodeEditor.Editor;
+                var externalCodeEditor = simpleton.CurrentCodeEditor;
+                CodeEditor.Unregister(externalCodeEditor);
+                Dictionary<string, string> installations = simpleton.GetFoundScriptEditorPaths();
+                UnityEngine.Debug.Log($"Clearing Installations: {string.Join(',', installations)}");
+
+                //TODO: GetInstalltionForPath, then Unregister
+                // EditorPrefs.DeleteAll();
             }
 
             EditorGUILayout.LabelField("Generate .csproj files for:");
