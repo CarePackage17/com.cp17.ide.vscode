@@ -20,6 +20,12 @@ namespace VSCodeEditor
         ProjectGeneration _projectGenerator;
         Task<List<CodeEditor.Installation>> _discoveryTask;
 
+        ProjectGenerationFlag ProjectGenerationSettings
+        {
+            get => (ProjectGenerationFlag)EditorPrefs.GetInt("unity_project_generation_flag", defaultValue: 0);
+            set => EditorPrefs.SetInt("unity_project_generation_flag", (int)value);
+        }
+
         static NewEditor()
         {
             UnityEngine.Debug.Log("InitializeOnLoad called us");
@@ -39,7 +45,7 @@ namespace VSCodeEditor
             _discoveryTask = Discovery.DiscoverVsCodeInstallsAsync();
         }
 
-        //This may not be null, otherwise the preferences window is fucked
+        //This may not return null, otherwise the preferences window is fucked
         public CodeEditor.Installation[] Installations
         {
             get
@@ -57,7 +63,56 @@ namespace VSCodeEditor
 
         public void OnGUI()
         {
-            // GUI.Label(new Rect(0, 0, 100, 30), "Hello");
+            // Arguments = EditorGUILayout.TextField("External Script Editor Args", Arguments);
+            // if (GUILayout.Button(k_ResetArguments, GUILayout.Width(120)))
+            // {
+            //     Arguments = DefaultArgument;
+            // }
+
+            EditorGUILayout.LabelField("Generate .csproj files for:");
+            EditorGUI.indentLevel++;
+            SettingsButton(ProjectGenerationFlag.Embedded, "Embedded packages", "");
+            SettingsButton(ProjectGenerationFlag.Local, "Local packages", "");
+            SettingsButton(ProjectGenerationFlag.Registry, "Registry packages", "");
+            SettingsButton(ProjectGenerationFlag.Git, "Git packages", "");
+            SettingsButton(ProjectGenerationFlag.BuiltIn, "Built-in packages", "");
+            SettingsButton(ProjectGenerationFlag.LocalTarBall, "Local tarball", "");
+            SettingsButton(ProjectGenerationFlag.Unknown, "Packages from unknown sources", "");
+            // RegenerateProjectFiles();
+            EditorGUI.indentLevel--;
+
+            // HandledExtensionsString = EditorGUILayout.TextField(new GUIContent("Extensions handled: "), HandledExtensionsString);
+        }
+
+        void SettingsButton(ProjectGenerationFlag preference, string optionText, string tooltip)
+        {
+            ProjectGenerationFlag currentSettings = ProjectGenerationSettings;
+
+            bool prefEnabled = currentSettings.HasFlag(preference);
+            bool newValue = EditorGUILayout.Toggle(new GUIContent(optionText, tooltip), prefEnabled);
+            if (newValue != prefEnabled)
+            {
+                ProjectGenerationSettings = currentSettings ^ preference;
+            }
+        }
+
+        void RegenerateProjectFilesButton()
+        {
+            var rect = EditorGUI.IndentedRect(EditorGUILayout.GetControlRect(new GUILayoutOption[] { }));
+            rect.width = 252;
+            if (GUI.Button(rect, "Regenerate project files"))
+            {
+                _projectGenerator.OnlyJobified = false;
+                _projectGenerator.Sync();
+            }
+
+            var anotherRect = EditorGUI.IndentedRect(EditorGUILayout.GetControlRect(new GUILayoutOption[] { }));
+            anotherRect.width = 252;
+            if (GUI.Button(anotherRect, "Only JobifiedSync"))
+            {
+                _projectGenerator.OnlyJobified = true;
+                _projectGenerator.Sync();
+            }
         }
 
         //Called when somebody double-clicks a script file (and others with extensions we handle?)
@@ -133,73 +188,6 @@ namespace VSCodeEditor
 
             installation = default;
             return false;
-        }
-    }
-
-    static class Discovery
-    {
-        static readonly string[] KnownVsCodeInstallFolders = new[]
-        {
-            #if UNITY_EDITOR_LINUX
-            "/bin/",
-            "/usr/bin/",
-            "/var/lib/flatpak/exports/bin/",
-            #endif
-            #if UNITY_EDITOR_WIN
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-            #endif
-            #if UNITY_EDITOR_OSX
-            "/Applications/"
-            #endif
-        };
-        static readonly string[] KnownVsCodeExecutableNames = new[]
-        {
-            #if UNITY_EDITOR_LINUX
-            "code",
-            "codium",
-            "com.visualstudio.code",
-            "com.vscodium.codium"
-            #endif
-            #if UNITY_EDITOR_WIN
-            "code.exe",
-            "code.cmd",
-            "code-insiders.cmd",
-            #endif
-            #if UNITY_EDITOR_OSX
-            "visualstudiocode.app",
-            "visualstudiocode-insiders.app",
-            "vscode.app",
-            "code.app",
-            #endif
-        };
-
-        internal static Task<List<CodeEditor.Installation>> DiscoverVsCodeInstallsAsync()
-        {
-            //This doesn't need the Unity native API, so we can run it on the thread pool.
-            return Task.Run(() =>
-            {
-                List<CodeEditor.Installation> installations = new();
-
-                foreach (string folder in KnownVsCodeInstallFolders)
-                {
-                    foreach (string fileName in KnownVsCodeExecutableNames)
-                    {
-                        string finalPath = Path.Combine(folder, fileName);
-                        if (File.Exists(finalPath))
-                        {
-                            CodeEditor.Installation installation = new()
-                            {
-                                Name = $"New VSCode ({finalPath})",
-                                Path = finalPath
-                            };
-                            installations.Add(installation);
-                        }
-                    }
-                }
-
-                return installations;
-            });
         }
     }
 
