@@ -16,7 +16,7 @@ namespace VSCodeEditor
     {
         static readonly string UnityProjectPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
 
-        List<CodeEditor.Installation> _installations;
+        List<CodeEditor.Installation>? _installations;
         ProjectGeneration _projectGenerator;
         Task<List<CodeEditor.Installation>> _discoveryTask;
 
@@ -51,7 +51,7 @@ namespace VSCodeEditor
             get
             {
                 UnityEngine.Debug.Log("Somebody asking for installations");
-                return _installations.ToArray();
+                return _installations!.ToArray();
             }
         }
 
