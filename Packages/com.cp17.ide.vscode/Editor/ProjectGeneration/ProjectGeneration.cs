@@ -335,6 +335,8 @@ namespace VSCodeEditor
         {
             s_excludedAssemblyMarker.Begin();
 
+            ProjectGenerationFlag settings = (ProjectGenerationFlag)EditorPrefs.GetInt("unity_project_generation_flag", 0);
+
             for (int i = 0; i < assemblies.Length; i++)
             {
                 Assembly assembly = assemblies[i];
@@ -346,7 +348,7 @@ namespace VSCodeEditor
                 {
                     PackageSource source = packageInfo.source;
 
-                    if (!IsAssemblyIncluded(source, m_AssemblyNameProvider.ProjectGenerationFlag))
+                    if (!IsAssemblyIncluded(source, settings))
                     {
                         excludedAssemblies.Add(new(assembly.name));
                     }

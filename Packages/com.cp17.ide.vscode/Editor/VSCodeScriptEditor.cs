@@ -78,7 +78,7 @@ namespace VSCodeEditor
             SettingsButton(ProjectGenerationFlag.BuiltIn, "Built-in packages", "");
             SettingsButton(ProjectGenerationFlag.LocalTarBall, "Local tarball", "");
             SettingsButton(ProjectGenerationFlag.Unknown, "Packages from unknown sources", "");
-            // RegenerateProjectFiles();
+            RegenerateProjectFilesButton();
             EditorGUI.indentLevel--;
 
             // HandledExtensionsString = EditorGUILayout.TextField(new GUIContent("Extensions handled: "), HandledExtensionsString);
