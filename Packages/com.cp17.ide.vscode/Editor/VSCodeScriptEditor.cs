@@ -17,7 +17,10 @@ namespace VSCodeEditor
         //For some reason using the previous string ("unity_project_generation_flag") resulted in weird behavior on domain reloads
         //(settings being toggled between all on and all off). Maybe there's some other code fucking with those?
         //Anyway, using our own key sidesteps the issue, so let's go on with it.
-        public const string CsprojGenerationSettingsKey = "csproj_generation_settings";
+        public const string CsprojGenerationSettingsKey = "com.cp17.ide.vscode.csproj-generation-settings";
+        const string ArgumentsSettingsKey = "com.cp17.ide.vscode.arguments";
+        //https://code.visualstudio.com/docs/editor/command-line#_launching-from-command-line
+        const string DefaultArgument = "$(ProjectPath) -g $(File):$(Line):$(Column)";
         static readonly string UnityProjectPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
 
         List<CodeEditor.Installation>? _installations;
@@ -30,10 +33,16 @@ namespace VSCodeEditor
             set => EditorPrefs.SetInt(CsprojGenerationSettingsKey, (int)value);
         }
 
+        string LaunchArguments
+        {
+            get => EditorPrefs.GetString(ArgumentsSettingsKey, DefaultArgument);
+            set => EditorPrefs.SetString(ArgumentsSettingsKey, value);
+        }
+
         static NewEditor()
         {
-            UnityEngine.Debug.Log("InitializeOnLoad called us");
-            UnityEngine.Debug.Log($"Current gen settings: {(ProjectGenerationFlag)EditorPrefs.GetInt(CsprojGenerationSettingsKey, defaultValue: 0)}");
+            Verbose.Log("InitializeOnLoad called us");
+            Verbose.Log($"Current gen settings: {(ProjectGenerationFlag)EditorPrefs.GetInt(CsprojGenerationSettingsKey, defaultValue: 0)}");
 
             //Here we can create an actual instance of IExternalCodeEditor and register it, then
             //it should show up in the UI.
@@ -55,7 +64,7 @@ namespace VSCodeEditor
         {
             get
             {
-                UnityEngine.Debug.Log("Somebody asking for installations");
+                Verbose.Log("Somebody asking for installations");
                 return _installations!.ToArray();
             }
         }
@@ -63,16 +72,21 @@ namespace VSCodeEditor
         //This is called when one of our installations is selected from the preferences window
         public void Initialize(string editorInstallationPath)
         {
-            UnityEngine.Debug.Log($"Initialize called with path {editorInstallationPath}");
+            Verbose.Log($"Initialize called with path {editorInstallationPath}");
         }
 
+        //https://docs.unity3d.com/Manual/gui-Basics.html
+        //Unfortunately there doesn't seem to be a UI Toolkit way of doing this as of 2021.3.
         public void OnGUI()
         {
-            // Arguments = EditorGUILayout.TextField("External Script Editor Args", Arguments);
-            // if (GUILayout.Button(k_ResetArguments, GUILayout.Width(120)))
-            // {
-            //     Arguments = DefaultArgument;
-            // }
+            LaunchArguments = EditorGUILayout.TextField("External Script Editor Args", LaunchArguments);
+
+            //maybe localization should use this instead?
+            //https://docs.unity3d.com/2021.3/Documentation/ScriptReference/L10n.html
+            if (GUILayout.Button(EditorGUIUtility.TrTextContent("Reset argument"), GUILayout.Width(120)))
+            {
+                LaunchArguments = DefaultArgument;
+            }
 
             EditorGUILayout.LabelField("Generate .csproj files for:");
             EditorGUI.indentLevel++;
@@ -124,45 +138,34 @@ namespace VSCodeEditor
         //or uses the "Assets > Open C# Project" menu item.
         public bool OpenProject(string filePath = "", int line = -1, int column = -1)
         {
-            //https://code.visualstudio.com/docs/editor/command-line#_launching-from-command-line
-            StringBuilder argsBuilder = new(UnityProjectPath);
-            if (!string.IsNullOrEmpty(filePath)) //Assets > Open C# Project will not pass a file name
+            //Default argument is the project folder. Since "Assets > Open C# Project" will not pass
+            //us a file name, we set this as a fallback.
+            string args = UnityProjectPath;
+
+            if (!string.IsNullOrEmpty(filePath))
             {
-                argsBuilder.Append(' ');
-                argsBuilder.Append($"-g {filePath}");
-
-                //This happens when a user double-clicks a file path in a stack trace within the console window.
-                if (line != -1)
-                {
-                    argsBuilder.Append($":{line}");
-                }
-
-                if (column != -1)
-                {
-                    argsBuilder.Append($":{column}");
-                }
+                //This does QuoteForProcessStart internally, so we don't need to do it later.
+                args = CodeEditor.ParseArgument(LaunchArguments, filePath, line, column);
             }
 
-            //Get currently selected editor installation and open it with whatever args we get
-            // TODO: CodeEditor.ParseArgument
-            string args = argsBuilder.ToString();
-            UnityEngine.Debug.Log($"Opening editor at {CodeEditor.CurrentEditorPath} with {args}");
-            return CodeEditor.OSOpenFile(CodeEditor.CurrentEditorPath, args);
+            //Not sure if we need to quote the editor path too. TODO: test on Windows.
+            string editorPath = CodeEditor.QuoteForProcessStart(CodeEditor.CurrentEditorPath);
+            UnityEngine.Debug.Log($"Opening editor at {editorPath} with {args}");
+
+            return CodeEditor.OSOpenFile(editorPath, args);
         }
 
         public void SyncAll()
         {
-            UnityEngine.Debug.Log("SyncAll called");
+            Verbose.Log("SyncAll called");
 
-            //Generate projects/sln and other stuff
             _projectGenerator.Sync();
         }
 
         public void SyncIfNeeded(string[] addedFiles, string[] deletedFiles, string[] movedFiles, string[] movedFromFiles, string[] importedFiles)
         {
-            UnityEngine.Debug.Log("SyncIfNeeded called");
+            Verbose.Log("SyncIfNeeded called");
 
-            //Generate projects/sln and other stuff (if a file that affects compilation changed)
             _projectGenerator.Sync();
         }
 
@@ -171,7 +174,7 @@ namespace VSCodeEditor
         //Still haven't found a way to clear those (probably uninstalling editor, but it's not in EditorPrefs for some reason).
         public bool TryGetInstallationForPath(string editorPath, out CodeEditor.Installation installation)
         {
-            UnityEngine.Debug.Log($"TryGetInstallationForPath called with {editorPath}");
+            Verbose.Log($"TryGetInstallationForPath called with {editorPath}");
 
             //The task has been started before, but now we need the result. Since we can't change the signature of this
             //method (part of IExternalCodeEditor) we use .Result instead of await.
@@ -196,7 +199,16 @@ namespace VSCodeEditor
         }
     }
 
-    [InitializeOnLoad]
+    static class Verbose
+    {
+        [Conditional("CP17_VSCODE_VERBOSE")]
+        public static void Log(string message)
+        {
+            UnityEngine.Debug.Log(message);
+        }
+    }
+
+    // [InitializeOnLoad]
     public class VSCodeScriptEditor : IExternalCodeEditor
     {
         const string vscode_argument = "vscode_arguments";
