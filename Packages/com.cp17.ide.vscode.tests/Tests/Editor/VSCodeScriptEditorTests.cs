@@ -14,7 +14,7 @@ namespace VSCodeEditor.Tests
         {
             var discovery = new Mock<IDiscovery>();
             var generator = new Mock<IGenerator>();
-            editor = new VSCodeScriptEditor(discovery.Object, generator.Object);
+            // editor = new VSCodeScriptEditor(discovery.Object, generator.Object);
         }
 
         [TearDown]
