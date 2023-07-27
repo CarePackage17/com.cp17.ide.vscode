@@ -6,7 +6,6 @@ using UnityEditor;
 using UnityEngine;
 using Unity.CodeEditor;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace VSCodeEditor
@@ -19,6 +18,8 @@ namespace VSCodeEditor
         //Anyway, using our own key sidesteps the issue, so let's go on with it.
         public const string CsprojGenerationSettingsKey = "com.cp17.ide.vscode.csproj-generation-settings";
         const string ArgumentsSettingsKey = "com.cp17.ide.vscode.arguments";
+        const string ExtensionsSettingsKey = "com.cp17.ide.vscode.extensions";
+
         //https://code.visualstudio.com/docs/editor/command-line#_launching-from-command-line
         const string DefaultArgument = "$(ProjectPath) -g $(File):$(Line):$(Column)";
         static readonly string UnityProjectPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
@@ -37,6 +38,24 @@ namespace VSCodeEditor
         {
             get => EditorPrefs.GetString(ArgumentsSettingsKey, DefaultArgument);
             set => EditorPrefs.SetString(ArgumentsSettingsKey, value);
+        }
+
+        static string HandledExtensionsString
+        {
+            get => EditorPrefs.GetString(ExtensionsSettingsKey, string.Join(";", DefaultExtensions));
+            set => EditorPrefs.SetString(ExtensionsSettingsKey, value);
+        }
+
+        static IEnumerable<string> DefaultExtensions
+        {
+            get
+            {
+                string[] customExtensions = new[] { "json", "asmdef", "log", "rsp" };
+                return EditorSettings.projectGenerationBuiltinExtensions
+                    .Concat(EditorSettings.projectGenerationUserExtensions)
+                    .Concat(customExtensions)
+                    .Distinct();
+            }
         }
 
         static NewEditor()
@@ -64,7 +83,7 @@ namespace VSCodeEditor
         {
             get
             {
-                Verbose.Log("Somebody asking for installations");
+                Verbose.Log("Unity asking for installations");
                 return _installations!.ToArray();
             }
         }
@@ -100,7 +119,8 @@ namespace VSCodeEditor
             RegenerateProjectFilesButton();
             EditorGUI.indentLevel--;
 
-            // HandledExtensionsString = EditorGUILayout.TextField(new GUIContent("Extensions handled: "), HandledExtensionsString);
+            //TODO: maybe a reset button for this like for editor args?
+            HandledExtensionsString = EditorGUILayout.TextField(new GUIContent("Extensions handled: "), HandledExtensionsString);
         }
 
         void SettingsButton(ProjectGenerationFlag preference, string optionText, string tooltip)
@@ -134,6 +154,23 @@ namespace VSCodeEditor
             }
         }
 
+        bool ExtensionHandledByUs(ReadOnlySpan<char> filePath)
+        {
+            var extension = Path.GetExtension(filePath);
+            if (!extension.IsEmpty)
+            {
+                //we don't want the dot when doing the comparison, so advance by 1 char
+                extension = extension[1..];
+            }
+
+            if (!HandledExtensionsString.Split(';', StringSplitOptions.RemoveEmptyEntries).Contains(extension.ToString()))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         //Called when somebody double-clicks a script file (and others with extensions we handle?)
         //or uses the "Assets > Open C# Project" menu item.
         public bool OpenProject(string filePath = "", int line = -1, int column = -1)
@@ -144,6 +181,8 @@ namespace VSCodeEditor
 
             if (!string.IsNullOrEmpty(filePath))
             {
+                if (!ExtensionHandledByUs(filePath)) return false;
+
                 //This does QuoteForProcessStart internally, so we don't need to do it later.
                 args = CodeEditor.ParseArgument(LaunchArguments, filePath, line, column);
             }
