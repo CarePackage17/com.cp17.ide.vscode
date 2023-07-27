@@ -5,9 +5,9 @@ using System.Threading.Tasks;
 using Unity.CodeEditor;
 
 static class Discovery
+{
+    static readonly string[] KnownVsCodeInstallFolders = new[]
     {
-        static readonly string[] KnownVsCodeInstallFolders = new[]
-        {
             #if UNITY_EDITOR_LINUX
             "/bin/",
             "/usr/bin/",
@@ -21,8 +21,8 @@ static class Discovery
             "/Applications/"
             #endif
         };
-        static readonly string[] KnownVsCodeExecutableNames = new[]
-        {
+    static readonly string[] KnownVsCodeExecutableNames = new[]
+    {
             #if UNITY_EDITOR_LINUX
             "code",
             "codium",
@@ -42,38 +42,42 @@ static class Discovery
             #endif
         };
 
-        internal static Task<List<CodeEditor.Installation>> DiscoverVsCodeInstallsAsync()
+    internal static Task<List<CodeEditor.Installation>> DiscoverVsCodeInstallsAsync()
+    {
+        //This doesn't need the Unity native API, so we can run it on the thread pool.
+        return Task.Run(() =>
         {
-            //This doesn't need the Unity native API, so we can run it on the thread pool.
-            return Task.Run(() =>
+            List<CodeEditor.Installation> installations = new();
+
+            foreach (string folder in KnownVsCodeInstallFolders)
             {
-                List<CodeEditor.Installation> installations = new();
-
-                foreach (string folder in KnownVsCodeInstallFolders)
+                foreach (string fileName in KnownVsCodeExecutableNames)
                 {
-                    foreach (string fileName in KnownVsCodeExecutableNames)
+                    string finalPath = Path.Combine(folder, fileName);
+                    if (File.Exists(finalPath))
                     {
-                        string finalPath = Path.Combine(folder, fileName);
-                        if (File.Exists(finalPath))
-                        {
-                            //This can be made prettier, I'm sure.
-                            ProcessStartInfo info = new(finalPath, "--version");
-                            info.RedirectStandardOutput = true;
-                            info.UseShellExecute = false;
-                            Process vsCodeProcess = Process.Start(info);
-                            string output = vsCodeProcess.StandardOutput.ReadLine();
+                        //This can be made prettier, I'm sure.
+                        ProcessStartInfo info = new(finalPath, "--version");
+                        info.RedirectStandardOutput = true;
+                        info.UseShellExecute = false;
+                        Process vsCodeProcess = Process.Start(info);
+                        string output = vsCodeProcess.StandardOutput.ReadLine();
 
-                            CodeEditor.Installation installation = new()
-                            {
-                                Name = $"VS Code {output} ({finalPath})",
-                                Path = finalPath
-                            };
-                            installations.Add(installation);
-                        }
+                        //Unity uses '/' as a delimiter to create submenus, which we don't want in this case.
+                        //We use a different Unicode char that looks kinda like a slash, as suggested here:
+                        //https://discussions.unity.com/t/can-genericmenu-item-content-display/63119/4
+                        string displayPath = finalPath.Replace("/", "\u200A\u2044");
+                        CodeEditor.Installation installation = new()
+                        {
+                            Name = $"VS Code {output} ({displayPath})",
+                            Path = finalPath
+                        };
+                        installations.Add(installation);
                     }
                 }
+            }
 
-                return installations;
-            });
-        }
+            return installations;
+        });
     }
+}

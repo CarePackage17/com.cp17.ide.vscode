@@ -55,7 +55,7 @@ namespace VSCodeEditor
             }
         }
 
-        //This is called when we're selected from the preferences window
+        //This is called when one of our installations is selected from the preferences window
         public void Initialize(string editorInstallationPath)
         {
             UnityEngine.Debug.Log($"Initialize called with path {editorInstallationPath}");
