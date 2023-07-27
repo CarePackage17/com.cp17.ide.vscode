@@ -56,12 +56,7 @@ static class Discovery
                     string finalPath = Path.Combine(folder, fileName);
                     if (File.Exists(finalPath))
                     {
-                        //This can be made prettier, I'm sure.
-                        ProcessStartInfo info = new(finalPath, "--version");
-                        info.RedirectStandardOutput = true;
-                        info.UseShellExecute = false;
-                        Process vsCodeProcess = Process.Start(info);
-                        string output = vsCodeProcess.StandardOutput.ReadLine();
+                        string version = GetVsCodeVersion(finalPath);
 
                         //Unity uses '/' as a delimiter to create submenus, which we don't want in this case.
                         //We use a different Unicode char that looks kinda like a slash, as suggested here:
@@ -69,7 +64,7 @@ static class Discovery
                         string displayPath = finalPath.Replace("/", "\u200A\u2044");
                         CodeEditor.Installation installation = new()
                         {
-                            Name = $"VS Code {output} ({displayPath})",
+                            Name = $"VS Code {version} ({displayPath})",
                             Path = finalPath
                         };
                         installations.Add(installation);
@@ -79,5 +74,21 @@ static class Discovery
 
             return installations;
         });
+    }
+
+    static string GetVsCodeVersion(string vsCodeExePath)
+    {
+        ProcessStartInfo info = new(vsCodeExePath, "--version")
+        {
+            RedirectStandardOutput = true,
+            UseShellExecute = false
+        };
+        using Process vsCodeProcess = Process.Start(info);
+
+        //At the time of writing vscode --version returned three lines: version, commit hash and CPU architecture.
+        //We only care about displaying the version, so reading the first line is enough.
+        string output = vsCodeProcess.StandardOutput.ReadLine();
+
+        return output;
     }
 }
