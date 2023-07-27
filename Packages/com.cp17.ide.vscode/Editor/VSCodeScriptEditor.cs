@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace VSCodeEditor
 {
     [InitializeOnLoad]
-    class NewEditor : IExternalCodeEditor
+    class VSCodeEditor : IExternalCodeEditor
     {
         //For some reason using the previous string ("unity_project_generation_flag") resulted in weird behavior on domain reloads
         //(settings being toggled between all on and all off). Maybe there's some other code fucking with those?
@@ -58,18 +58,18 @@ namespace VSCodeEditor
             }
         }
 
-        static NewEditor()
+        static VSCodeEditor()
         {
             Verbose.Log("InitializeOnLoad called us");
             Verbose.Log($"Current gen settings: {(ProjectGenerationFlag)EditorPrefs.GetInt(CsprojGenerationSettingsKey, defaultValue: 0)}");
 
             //Here we can create an actual instance of IExternalCodeEditor and register it, then
             //it should show up in the UI.
-            NewEditor editor = new();
+            VSCodeEditor editor = new();
             CodeEditor.Register(editor);
         }
 
-        NewEditor()
+        VSCodeEditor()
         {
             _projectGenerator = new(UnityProjectPath);
             _projectGenerator.OnlyJobified = true;

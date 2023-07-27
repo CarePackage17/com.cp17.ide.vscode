@@ -48,9 +48,9 @@ namespace VSCodeEditor
 
     public class ProjectGeneration : IGenerator
     {
-        static ProfilerMarker s_syncMarker = new($"{nameof(NewEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
-        static ProfilerMarker s_genMarker = new($"{nameof(NewEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
-        static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(NewEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
+        static ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
+        static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
+        static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
         static ProfilerMarker s_excludedAssemblyMarker = new($"{nameof(GetExcludedAssemblies)}");
         static ProfilerMarker s_getDataMarker = new("GetDataFromUnity");
         static ProfilerMarker s_setupJobsMarker = new("SetupJobs");
@@ -335,7 +335,7 @@ namespace VSCodeEditor
         {
             s_excludedAssemblyMarker.Begin();
 
-            ProjectGenerationFlag settings = (ProjectGenerationFlag)EditorPrefs.GetInt(NewEditor.CsprojGenerationSettingsKey, 0);
+            ProjectGenerationFlag settings = (ProjectGenerationFlag)EditorPrefs.GetInt(VSCodeEditor.CsprojGenerationSettingsKey, 0);
 
             for (int i = 0; i < assemblies.Length; i++)
             {
