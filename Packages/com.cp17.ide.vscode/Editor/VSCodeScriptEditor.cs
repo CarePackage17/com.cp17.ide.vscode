@@ -14,6 +14,10 @@ namespace VSCodeEditor
     [InitializeOnLoad]
     class NewEditor : IExternalCodeEditor
     {
+        //For some reason using the previous string ("unity_project_generation_flag") resulted in weird behavior on domain reloads
+        //(settings being toggled between all on and all off). Maybe there's some other code fucking with those?
+        //Anyway, using our own key sidesteps the issue, so let's go on with it.
+        public const string CsprojGenerationSettingsKey = "csproj_generation_settings";
         static readonly string UnityProjectPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
 
         List<CodeEditor.Installation>? _installations;
@@ -22,13 +26,14 @@ namespace VSCodeEditor
 
         ProjectGenerationFlag ProjectGenerationSettings
         {
-            get => (ProjectGenerationFlag)EditorPrefs.GetInt("unity_project_generation_flag", defaultValue: 0);
-            set => EditorPrefs.SetInt("unity_project_generation_flag", (int)value);
+            get => (ProjectGenerationFlag)EditorPrefs.GetInt(CsprojGenerationSettingsKey, defaultValue: 0);
+            set => EditorPrefs.SetInt(CsprojGenerationSettingsKey, (int)value);
         }
 
         static NewEditor()
         {
             UnityEngine.Debug.Log("InitializeOnLoad called us");
+            UnityEngine.Debug.Log($"Current gen settings: {(ProjectGenerationFlag)EditorPrefs.GetInt(CsprojGenerationSettingsKey, defaultValue: 0)}");
 
             //Here we can create an actual instance of IExternalCodeEditor and register it, then
             //it should show up in the UI.

@@ -335,7 +335,7 @@ namespace VSCodeEditor
         {
             s_excludedAssemblyMarker.Begin();
 
-            ProjectGenerationFlag settings = (ProjectGenerationFlag)EditorPrefs.GetInt("unity_project_generation_flag", 0);
+            ProjectGenerationFlag settings = (ProjectGenerationFlag)EditorPrefs.GetInt(NewEditor.CsprojGenerationSettingsKey, 0);
 
             for (int i = 0; i < assemblies.Length; i++)
             {
