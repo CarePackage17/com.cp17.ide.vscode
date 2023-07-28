@@ -116,6 +116,7 @@ namespace VSCodeEditor
             SettingsButton(ProjectGenerationFlag.BuiltIn, "Built-in packages", "");
             SettingsButton(ProjectGenerationFlag.LocalTarBall, "Local tarball", "");
             SettingsButton(ProjectGenerationFlag.Unknown, "Packages from unknown sources", "");
+            SettingsButton(ProjectGenerationFlag.PlayerAssemblies, "Player projects", "");
             RegenerateProjectFilesButton();
             EditorGUI.indentLevel--;
 

@@ -361,14 +361,6 @@ namespace VSCodeEditor
         void JobifiedSync()
         {
             s_jobifiedSyncMarker.Begin();
-            // Debug.Log($"Running {nameof(JobifiedSync)}");
-            // var fileInfo = new Mono.Unix.UnixFileInfo("/usr/bin/code");
-            // if (fileInfo.Exists) Debug.Log("I exist!");
-            // else Debug.Log("noooo");
-            // using (var fs = File.OpenRead("/usr/bin/code"))
-            // {
-            //     Debug.Log("uh I guess I can read?");
-            // }
 
             string[] systemReferenceDirs;
             Assembly[] assemblies;

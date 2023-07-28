@@ -7,7 +7,7 @@
 
 - ~~Respect user settings instead of generating all the projects all the time~~
 - ~~Move cost of string conversion (utf16 to utf8) into job so main thread doesn't drown in work~~
-- Parse stuff from response files and add into the project (nullable, extra files, compiler switches, etc.)
+- ~~Parse stuff from response files and add into the project (nullable, extra files, compiler switches, etc.)~~
 - Debug `dotnet build` circular dependency when building sln (wtf?)
 - Figure out how `SyncIfNeeded` is supposed to work because it doesn't look like Unity tells us when a source file is added/deleted, oof
   - Maybe a linux bug, on Windows it does tell me at least in the added/deleted cases
