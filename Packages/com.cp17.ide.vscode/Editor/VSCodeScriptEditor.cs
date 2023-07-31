@@ -139,17 +139,9 @@ namespace VSCodeEditor
 
         void RegenerateProjectFilesButton()
         {
-            var rect = EditorGUI.IndentedRect(EditorGUILayout.GetControlRect(new GUILayoutOption[] { }));
-            rect.width = 252;
-            if (GUI.Button(rect, "Regenerate project files"))
-            {
-                _projectGenerator.OnlyJobified = false;
-                _projectGenerator.Sync();
-            }
-
             var anotherRect = EditorGUI.IndentedRect(EditorGUILayout.GetControlRect(new GUILayoutOption[] { }));
             anotherRect.width = 252;
-            if (GUI.Button(anotherRect, "Only JobifiedSync"))
+            if (GUI.Button(anotherRect, "Regenerate project files"))
             {
                 _projectGenerator.OnlyJobified = true;
                 _projectGenerator.Sync();
