@@ -25,8 +25,8 @@ namespace VSCodeEditor
         static readonly string UnityProjectPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
 
         List<CodeEditor.Installation>? _installations;
-        ProjectGeneration _projectGenerator;
-        Task<List<CodeEditor.Installation>> _discoveryTask;
+        readonly ProjectGeneration _projectGenerator;
+        readonly Task<List<CodeEditor.Installation>> _discoveryTask;
 
         ProjectGenerationFlag ProjectGenerationSettings
         {
@@ -71,8 +71,10 @@ namespace VSCodeEditor
 
         VSCodeEditor()
         {
-            _projectGenerator = new(UnityProjectPath);
-            _projectGenerator.OnlyJobified = true;
+            _projectGenerator = new(UnityProjectPath)
+            {
+                OnlyJobified = true
+            };
             _projectGenerator.GenerateAll(true);
 
             _discoveryTask = Discovery.DiscoverVsCodeInstallsAsync();
@@ -123,46 +125,6 @@ namespace VSCodeEditor
 
             //TODO: maybe a reset button for this like for editor args?
             HandledExtensionsString = EditorGUILayout.TextField(new GUIContent("Extensions handled: "), HandledExtensionsString);
-        }
-
-        void SettingsButton(ProjectGenerationFlag preference, string optionText, string tooltip)
-        {
-            ProjectGenerationFlag currentSettings = ProjectGenerationSettings;
-
-            bool prefEnabled = currentSettings.HasFlag(preference);
-            bool newValue = EditorGUILayout.Toggle(new GUIContent(optionText, tooltip), prefEnabled);
-            if (newValue != prefEnabled)
-            {
-                ProjectGenerationSettings = currentSettings ^ preference;
-            }
-        }
-
-        void RegenerateProjectFilesButton()
-        {
-            var anotherRect = EditorGUI.IndentedRect(EditorGUILayout.GetControlRect(new GUILayoutOption[] { }));
-            anotherRect.width = 252;
-            if (GUI.Button(anotherRect, "Regenerate project files"))
-            {
-                _projectGenerator.OnlyJobified = true;
-                _projectGenerator.Sync();
-            }
-        }
-
-        bool ExtensionHandledByUs(ReadOnlySpan<char> filePath)
-        {
-            var extension = Path.GetExtension(filePath);
-            if (!extension.IsEmpty)
-            {
-                //we don't want the dot when doing the comparison, so advance by 1 char
-                extension = extension[1..];
-            }
-
-            if (!HandledExtensionsString.Split(';', StringSplitOptions.RemoveEmptyEntries).Contains(extension.ToString()))
-            {
-                return false;
-            }
-
-            return true;
         }
 
         //Called when somebody double-clicks a script file (and others with extensions we handle?)
@@ -228,6 +190,46 @@ namespace VSCodeEditor
 
             installation = default;
             return false;
+        }
+
+        void SettingsButton(ProjectGenerationFlag preference, string optionText, string tooltip)
+        {
+            ProjectGenerationFlag currentSettings = ProjectGenerationSettings;
+
+            bool prefEnabled = currentSettings.HasFlag(preference);
+            bool newValue = EditorGUILayout.Toggle(new GUIContent(optionText, tooltip), prefEnabled);
+            if (newValue != prefEnabled)
+            {
+                ProjectGenerationSettings = currentSettings ^ preference;
+            }
+        }
+
+        void RegenerateProjectFilesButton()
+        {
+            var anotherRect = EditorGUI.IndentedRect(EditorGUILayout.GetControlRect(new GUILayoutOption[] { }));
+            anotherRect.width = 252;
+            if (GUI.Button(anotherRect, "Regenerate project files"))
+            {
+                _projectGenerator.OnlyJobified = true;
+                _projectGenerator.Sync();
+            }
+        }
+
+        bool ExtensionHandledByUs(ReadOnlySpan<char> filePath)
+        {
+            var extension = Path.GetExtension(filePath);
+            if (!extension.IsEmpty)
+            {
+                //we don't want the dot when doing the comparison, so advance by 1 char
+                extension = extension[1..];
+            }
+
+            if (!HandledExtensionsString.Split(';', StringSplitOptions.RemoveEmptyEntries).Contains(extension.ToString()))
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 
