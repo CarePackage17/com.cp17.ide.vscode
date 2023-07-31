@@ -16,8 +16,9 @@ static class Discovery
             #endif
             #if UNITY_EDITOR_WIN
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code Insiders"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code", "bin")
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code Insiders"),
             #endif
             #if UNITY_EDITOR_OSX
             "/Applications/"
@@ -32,9 +33,8 @@ static class Discovery
             "com.vscodium.codium"
             #endif
             #if UNITY_EDITOR_WIN
-            "code.exe",
-            "code.cmd",
-            "code-insiders.cmd",
+            "Code.exe",
+            "Code - Insiders.exe",
             #endif
             #if UNITY_EDITOR_OSX
             "visualstudiocode.app",
@@ -87,9 +87,23 @@ static class Discovery
         //we could check if there's a .cmd relative to the exe path, use that to obtain the version but don't treat
         //that as a separate way to launch/interact with vscode? Not sure. Launching with folder/file works with the
         //main binary just fine.
-        if (!vsCodeExePath.AsSpan().EndsWith(".cmd"))
+
+        string exeDir = Path.GetDirectoryName(vsCodeExePath);
+        string cmdPath = Path.Combine(exeDir, "bin", "code.cmd");
+        string cmdInsidersPath = Path.Combine(exeDir, "bin", "code-insiders.cmd");
+
+        if (File.Exists(cmdPath))
         {
-            return "";
+            vsCodeExePath = cmdPath;
+        }
+        else if (File.Exists(cmdInsidersPath))
+        {
+            vsCodeExePath = cmdInsidersPath;
+        }
+        else
+        {
+            //On Windows we don't know how to obtain version info without the cmd file, so give up here.
+            return "unknown version";
         }
         #endif
 
