@@ -83,6 +83,10 @@ static class Discovery
         #if UNITY_EDITOR_WIN
         //On Windows the Code.exe binary does not accept command line args directly; code.cmd seems to handle that.
         //I guess we should ignore Code.exe here and only do something for the .cmd file.
+        //Also, when passing the .cmd path to OSOpenFile it spawns a command line window which is ugly...so maybe
+        //we could check if there's a .cmd relative to the exe path, use that to obtain the version but don't treat
+        //that as a separate way to launch/interact with vscode? Not sure. Launching with folder/file works with the
+        //main binary just fine.
         if (!vsCodeExePath.AsSpan().EndsWith(".cmd"))
         {
             return "";

@@ -178,7 +178,7 @@ namespace VSCodeEditor
         {
             //Default argument is the project folder. Since "Assets > Open C# Project" will not pass
             //us a file name, we set this as a fallback.
-            string args = UnityProjectPath;
+            string args = CodeEditor.QuoteForProcessStart(UnityProjectPath);
 
             if (!string.IsNullOrEmpty(filePath))
             {
@@ -188,8 +188,7 @@ namespace VSCodeEditor
                 args = CodeEditor.ParseArgument(LaunchArguments, filePath, line, column);
             }
 
-            //Not sure if we need to quote the editor path too. TODO: test on Windows.
-            string editorPath = CodeEditor.QuoteForProcessStart(CodeEditor.CurrentEditorPath);
+            string editorPath = CodeEditor.CurrentEditorPath;
             UnityEngine.Debug.Log($"Opening editor at {editorPath} with {args}");
 
             return CodeEditor.OSOpenFile(editorPath, args);
