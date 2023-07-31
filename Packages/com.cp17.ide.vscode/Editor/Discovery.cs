@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -14,8 +15,9 @@ static class Discovery
             "/var/lib/flatpak/exports/bin/",
             #endif
             #if UNITY_EDITOR_WIN
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code", "bin")
             #endif
             #if UNITY_EDITOR_OSX
             "/Applications/"
@@ -78,10 +80,20 @@ static class Discovery
 
     static string GetVsCodeVersion(string vsCodeExePath)
     {
+        #if UNITY_EDITOR_WIN
+        //On Windows the Code.exe binary does not accept command line args directly; code.cmd seems to handle that.
+        //I guess we should ignore Code.exe here and only do something for the .cmd file.
+        if (!vsCodeExePath.AsSpan().EndsWith(".cmd"))
+        {
+            return "";
+        }
+        #endif
+
         ProcessStartInfo info = new(vsCodeExePath, "--version")
         {
             RedirectStandardOutput = true,
-            UseShellExecute = false
+            UseShellExecute = false,
+            CreateNoWindow = true
         };
         using Process vsCodeProcess = Process.Start(info);
 
