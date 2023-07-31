@@ -84,7 +84,8 @@ namespace VSCodeEditor
             get
             {
                 Verbose.Log("Unity asking for installations");
-                return _installations!.ToArray();
+                if (_installations == null) return new CodeEditor.Installation[] { };
+                else return _installations.ToArray();
             }
         }
 
