@@ -12,8 +12,8 @@ namespace VSCodeEditor.Tests
         [SetUp]
         public void OneTimeSetUp()
         {
-            var discovery = new Mock<IDiscovery>();
-            var generator = new Mock<IGenerator>();
+            // var discovery = new Mock<IDiscovery>();
+            // var generator = new Mock<IGenerator>();
             // editor = new VSCodeScriptEditor(discovery.Object, generator.Object);
         }
 

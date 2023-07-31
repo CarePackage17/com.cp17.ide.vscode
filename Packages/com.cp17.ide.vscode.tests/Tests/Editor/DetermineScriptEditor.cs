@@ -47,17 +47,17 @@ namespace VSCodeEditor.Tests
 
         static void Discover(string path)
         {
-            var discovery = new Mock<IDiscovery>();
-            var generator = new Mock<IGenerator>();
+            // var discovery = new Mock<IDiscovery>();
+            // var generator = new Mock<IGenerator>();
 
-            discovery.Setup(x => x.PathCallback()).Returns(new[]
-            {
-                new CodeEditor.Installation
-                {
-                    Path = path,
-                    Name = path.Contains("Insiders") ? "Visual Studio Code Insiders" : "Visual Studio Code"
-                }
-            });
+            // discovery.Setup(x => x.PathCallback()).Returns(new[]
+            // {
+            //     new CodeEditor.Installation
+            //     {
+            //         Path = path,
+            //         Name = path.Contains("Insiders") ? "Visual Studio Code Insiders" : "Visual Studio Code"
+            //     }
+            // });
 
             // var editor = new VSCodeScriptEditor(discovery.Object, generator.Object);
 
