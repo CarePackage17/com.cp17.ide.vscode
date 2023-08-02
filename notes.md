@@ -23,3 +23,5 @@
 - Roslyn analyzer support?
 - Unit tests?
 - After jobified variant has parity, delete old stuff
+- ~~Write our own vscode settings file like the new VS extension does~~
+- Handle symlinks on Linux so installations are not duplicated (Mono.Posix go brrr)

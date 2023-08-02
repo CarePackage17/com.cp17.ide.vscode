@@ -48,19 +48,19 @@ namespace VSCodeEditor
 
     public class ProjectGeneration : IGenerator
     {
-        static ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
-        static ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
-        static ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
-        static ProfilerMarker s_excludedAssemblyMarker = new($"{nameof(GetExcludedAssemblies)}");
-        static ProfilerMarker s_getDataMarker = new("GetDataFromUnity");
-        static ProfilerMarker s_setupJobsMarker = new("SetupJobs");
-        static ProfilerMarker s_completeAndDisposeMarker = new("CompleteAndDisposeAllTheThings");
-        static ProfilerMarker s_slnGenMarker = new("SlnGeneration");
+        static readonly ProfilerMarker s_syncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(Sync)}");
+        static readonly ProfilerMarker s_genMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(GenerateAndWriteSolutionAndProjects)}");
+        static readonly ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
+        static readonly ProfilerMarker s_excludedAssemblyMarker = new($"{nameof(GetExcludedAssemblies)}");
+        static readonly ProfilerMarker s_getDataMarker = new("GetDataFromUnity");
+        static readonly ProfilerMarker s_setupJobsMarker = new("SetupJobs");
+        static readonly ProfilerMarker s_completeAndDisposeMarker = new("CompleteAndDisposeAllTheThings");
+        static readonly ProfilerMarker s_slnGenMarker = new("SlnGeneration");
 
         //These don't change at runtime, so we can cache them once and use them forever.
         //We could even use a ScriptableObject so it survives domain reloads if we want...
-        static string[] s_netStandardAssemblyDirectories = CompilationPipeline.GetSystemAssemblyDirectories(ApiCompatibilityLevel.NET_Standard);
-        static string[] s_net48AssemblyDirectories = CompilationPipeline.GetSystemAssemblyDirectories(ApiCompatibilityLevel.NET_Unity_4_8);
+        static readonly string[] s_netStandardAssemblyDirectories = CompilationPipeline.GetSystemAssemblyDirectories(ApiCompatibilityLevel.NET_Standard);
+        static readonly string[] s_net48AssemblyDirectories = CompilationPipeline.GetSystemAssemblyDirectories(ApiCompatibilityLevel.NET_Unity_4_8);
 
         enum ScriptingLanguage
         {
@@ -106,7 +106,6 @@ namespace VSCodeEditor
         ""**/*.MA"":true,
         ""**/*.obj"":true,
         ""**/*.OBJ"":true,
-        ""**/*.asset"":true,
         ""**/*.cubemap"":true,
         ""**/*.flare"":true,
         ""**/*.mat"":true,
@@ -582,6 +581,16 @@ namespace VSCodeEditor
             Debug.Log(sb.ToString());
 
             JobifiedCreateSln(projectsInSln);
+
+            string dotVsCodePath = Path.Combine(ProjectDirectory, ".vscode");
+            Directory.CreateDirectory(dotVsCodePath);
+            string settingsJsonPath = Path.Combine(dotVsCodePath, "settings.json");
+
+            //Only do this when it's not there yet -> respect user modifications
+            if (!File.Exists(settingsJsonPath))
+            {
+                File.WriteAllText(settingsJsonPath, k_SettingsJson);
+            }
 
             s_jobifiedSyncMarker.End();
         }
