@@ -369,15 +369,39 @@ namespace VSCodeEditor
 
             using (s_getDataMarker.Auto())
             {
-                AssembliesType assembliesType = AssembliesType.Editor;
-                //TODO: check settings and pass AssembliesType.Player if the user selected that
-                //here's how rider does it:
-                //https://github.com/needle-mirror/com.unity.ide.rider/blob/master/Rider/Editor/ProjectGeneration/AssemblyNameProvider.cs#L56
-
                 //This generates a lot of garbage, but it's the only way to get this data as of 2021 LTS.
-                assemblies = CompilationPipeline.GetAssemblies(assembliesType);
-            }
+                var editorAssemblies = CompilationPipeline.GetAssemblies(AssembliesType.Editor);
 
+                ProjectGenerationFlag settings = (ProjectGenerationFlag)EditorPrefs.GetInt(VSCodeEditor.CsprojGenerationSettingsKey, 0);
+                if (settings.HasFlag(ProjectGenerationFlag.PlayerAssemblies))
+                {
+                    var playerAssemblies = CompilationPipeline.GetAssemblies(AssembliesType.Player);
+
+                    for (int i = 0; i < playerAssemblies.Length; i++)
+                    {
+                        //here's how rider does this:
+                        //https://github.com/needle-mirror/com.unity.ide.rider/blob/master/Rider/Editor/ProjectGeneration/AssemblyNameProvider.cs#L56
+
+                        //we can't do the name change like this because private...
+                        //but I guess we could do it in the generate job maybe? either that or use the ctor with copies of most
+                        //things (generating lots of garbage, but I guess it's easier for now? usage of assembly.name would need a
+                        //cleanup...)
+                        // ass.name = 
+                        //TODO: We might wanna also change outputPath like rider does? needs investigation.
+                        Assembly ass = playerAssemblies[i];
+                        playerAssemblies[i] = new($"{ass.name}.Player", ass.outputPath, ass.sourceFiles, ass.defines,
+                            ass.assemblyReferences, ass.compiledAssemblyReferences, ass.flags);
+                    }
+
+                    assemblies = new Assembly[editorAssemblies.Length + playerAssemblies.Length];
+                    editorAssemblies.CopyTo(assemblies, 0);
+                    playerAssemblies.CopyTo(assemblies, editorAssemblies.Length);
+                }
+                else
+                {
+                    assemblies = editorAssemblies;
+                }
+            }
 
             //We can definitely cache this too, user settings change doesn't happen often usually.
             NativeParallelHashSet<FixedString4096Bytes> excludedAssemblies = new(assemblies.Length, Allocator.TempJob);
