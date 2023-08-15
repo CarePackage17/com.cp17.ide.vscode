@@ -328,7 +328,7 @@ namespace VSCodeEditor
                         //TODO: We might wanna also change outputPath like rider does? needs investigation.
                         Assembly ass = playerAssemblies[i];
                         playerAssemblies[i] = new($"{ass.name}.Player", ass.outputPath, ass.sourceFiles, ass.defines,
-                            ass.assemblyReferences, ass.compiledAssemblyReferences, ass.flags);
+                            ass.assemblyReferences, ass.compiledAssemblyReferences, ass.flags, ass.compilerOptions, ass.rootNamespace);
                     }
 
                     assemblies = new Assembly[editorAssemblies.Length + playerAssemblies.Length];
