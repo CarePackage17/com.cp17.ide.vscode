@@ -18,6 +18,7 @@
   - Also test on shitty hardware
   - URP template and boss room (https://github.com/Unity-Technologies/com.unity.multiplayer.samples.coop/releases) work fine so far
 - ~~Support for player projects like VS and Rider~~
+- Settings button for easily enabling debug logging (adding ifdef behind the scenes somewhere)
 - Check if we can use parallel jobs for the project generation stuff (probably requires UnsafeText, otherwise we can't store it in NativeArray)
 - ~~Jobify sln write? (not really necessary from perf viewpoint)~~
 - Roslyn analyzer support?

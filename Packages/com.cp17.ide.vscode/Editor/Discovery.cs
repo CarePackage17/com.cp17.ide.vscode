@@ -64,9 +64,8 @@ static class Discovery
                         if (attr.HasFlag(FileAttributes.ReparsePoint))
                         {
                             Mono.Unix.UnixSymbolicLinkInfo symLinkInfo = new(installPath);
-                            UnityEngine.Debug.Log($"Contents path for {installPath}: {symLinkInfo.ContentsPath}");
 
-                            //If we've encountered this installation before, we can safely skip it here.
+                            //If we've encountered the actual installation path before, we can safely skip it here.
                             if (resolvedSymlinkPaths.Contains(symLinkInfo.ContentsPath)) continue;
 
                             resolvedSymlinkPaths.Add(symLinkInfo.ContentsPath);
