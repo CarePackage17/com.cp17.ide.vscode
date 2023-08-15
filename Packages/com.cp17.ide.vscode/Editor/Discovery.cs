@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -12,12 +13,13 @@ static class Discovery
             "/bin/",
             "/usr/bin/",
             "/var/lib/flatpak/exports/bin/",
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "flatpak/exports/bin")
 #endif
 #if UNITY_EDITOR_WIN
-            Path.Combine(Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code"),
-            Path.Combine(Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code Insiders"),
-            Path.Combine(Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code"),
-            Path.Combine(Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code Insiders"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code Insiders"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code Insiders"),
 #endif
 #if UNITY_EDITOR_OSX
             "/Applications/"
