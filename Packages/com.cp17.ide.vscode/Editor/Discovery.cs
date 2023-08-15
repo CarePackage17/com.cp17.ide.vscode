@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -9,39 +8,39 @@ static class Discovery
 {
     static readonly string[] KnownVsCodeInstallFolders = new[]
     {
-            #if UNITY_EDITOR_LINUX
+#if UNITY_EDITOR_LINUX
             "/bin/",
             "/usr/bin/",
             "/var/lib/flatpak/exports/bin/",
-            #endif
-            #if UNITY_EDITOR_WIN
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code Insiders"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code Insiders"),
-            #endif
-            #if UNITY_EDITOR_OSX
+#endif
+#if UNITY_EDITOR_WIN
+            Path.Combine(Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code"),
+            Path.Combine(Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles), "Microsoft VS Code Insiders"),
+            Path.Combine(Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code"),
+            Path.Combine(Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Programs", "Microsoft VS Code Insiders"),
+#endif
+#if UNITY_EDITOR_OSX
             "/Applications/"
-            #endif
+#endif
         };
     static readonly string[] KnownVsCodeExecutableNames = new[]
     {
-            #if UNITY_EDITOR_LINUX
+#if UNITY_EDITOR_LINUX
             "code",
             "codium",
             "com.visualstudio.code",
             "com.vscodium.codium"
-            #endif
-            #if UNITY_EDITOR_WIN
+#endif
+#if UNITY_EDITOR_WIN
             "Code.exe",
             "Code - Insiders.exe",
-            #endif
-            #if UNITY_EDITOR_OSX
+#endif
+#if UNITY_EDITOR_OSX
             "visualstudiocode.app",
             "visualstudiocode-insiders.app",
             "vscode.app",
             "code.app",
-            #endif
+#endif
         };
 
     internal static Task<List<CodeEditor.Installation>> DiscoverVsCodeInstallsAsync()
@@ -49,25 +48,44 @@ static class Discovery
         //This doesn't need the Unity native API, so we can run it on the thread pool.
         return Task.Run(() =>
         {
+            List<string> resolvedSymlinkPaths = new();
             List<CodeEditor.Installation> installations = new();
 
             foreach (string folder in KnownVsCodeInstallFolders)
             {
                 foreach (string fileName in KnownVsCodeExecutableNames)
                 {
-                    string finalPath = Path.Combine(folder, fileName);
-                    if (File.Exists(finalPath))
+                    string installPath = Path.Combine(folder, fileName);
+                    string displayPath = installPath;
+                    if (File.Exists(installPath))
                     {
-                        string version = GetVsCodeVersion(finalPath);
+#if !UNITY_EDITOR_WIN
+                        FileAttributes attr = File.GetAttributes(installPath);
+                        if (attr.HasFlag(FileAttributes.ReparsePoint))
+                        {
+                            Mono.Unix.UnixSymbolicLinkInfo symLinkInfo = new(installPath);
+                            UnityEngine.Debug.Log($"Contents path for {installPath}: {symLinkInfo.ContentsPath}");
+
+                            //If we've encountered this installation before, we can safely skip it here.
+                            if (resolvedSymlinkPaths.Contains(symLinkInfo.ContentsPath)) continue;
+
+                            resolvedSymlinkPaths.Add(symLinkInfo.ContentsPath);
+
+                            // Not sure if I like this; it can give relative paths (symlinks do be like that?) and they
+                            // can look confusing to display. Might as well keep the link path for display.
+                            // displayPath = symLinkInfo.ContentsPath;
+                        }
+#endif
+                        string version = GetVsCodeVersion(installPath);
 
                         //Unity uses '/' as a delimiter to create submenus, which we don't want in this case.
                         //We use a different Unicode char that looks kinda like a slash, as suggested here:
                         //https://discussions.unity.com/t/can-genericmenu-item-content-display/63119/4
-                        string displayPath = finalPath.Replace("/", "\u200A\u2044");
+                        displayPath = displayPath.Replace("/", "\u200A\u2044");
                         CodeEditor.Installation installation = new()
                         {
                             Name = $"VS Code {version} ({displayPath})",
-                            Path = finalPath
+                            Path = installPath
                         };
                         installations.Add(installation);
                     }
@@ -80,7 +98,7 @@ static class Discovery
 
     static string GetVsCodeVersion(string vsCodeExePath)
     {
-        #if UNITY_EDITOR_WIN
+#if UNITY_EDITOR_WIN
         //On Windows the Code.exe binary does not accept command line args directly; code.cmd seems to handle that.
         //I guess we should ignore Code.exe here and only do something for the .cmd file.
         //Also, when passing the .cmd path to OSOpenFile it spawns a command line window which is ugly...so maybe
@@ -105,7 +123,7 @@ static class Discovery
             //On Windows we don't know how to obtain version info without the cmd file, so give up here.
             return "unknown version";
         }
-        #endif
+#endif
 
         ProcessStartInfo info = new(vsCodeExePath, "--version")
         {
