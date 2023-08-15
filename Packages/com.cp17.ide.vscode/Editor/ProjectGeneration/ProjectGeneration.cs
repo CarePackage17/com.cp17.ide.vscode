@@ -19,7 +19,6 @@ namespace VSCodeEditor
 {
     public interface IGenerator
     {
-        public bool OnlyJobified { get; set; }
         bool SyncIfNeeded(List<string> affectedFiles, string[] reimportedFiles);
         void Sync();
         string SolutionFile();
@@ -118,30 +117,8 @@ namespace VSCodeEditor
         ""Temp/"":true
     }
 }";
-
-        /// <summary>
-        /// Map source extensions to ScriptingLanguages
-        /// </summary>
-        static readonly Dictionary<string, ScriptingLanguage> k_BuiltinSupportedExtensions = new Dictionary<string, ScriptingLanguage>
-        {
-            { "cs", ScriptingLanguage.CSharp },
-            { "uxml", ScriptingLanguage.None },
-            { "uss", ScriptingLanguage.None },
-            { "shader", ScriptingLanguage.None },
-            { "compute", ScriptingLanguage.None },
-            { "cginc", ScriptingLanguage.None },
-            { "hlsl", ScriptingLanguage.None },
-            { "glslinc", ScriptingLanguage.None },
-            { "template", ScriptingLanguage.None },
-            { "raytrace", ScriptingLanguage.None }
-        };
-
-        string[] m_ProjectSupportedExtensions = Array.Empty<string>();
-
         public string ProjectDirectory { get; }
         IAssemblyNameProvider IGenerator.AssemblyNameProvider => m_AssemblyNameProvider;
-
-        public bool OnlyJobified { get; set; }
 
         public void GenerateAll(bool generateAll)
         {

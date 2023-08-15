@@ -71,10 +71,7 @@ namespace VSCodeEditor
 
         VSCodeEditor()
         {
-            _projectGenerator = new(UnityProjectPath)
-            {
-                OnlyJobified = true
-            };
+            _projectGenerator = new(UnityProjectPath);
             _projectGenerator.GenerateAll(true);
 
             _discoveryTask = Discovery.DiscoverVsCodeInstallsAsync();
@@ -210,7 +207,6 @@ namespace VSCodeEditor
             anotherRect.width = 252;
             if (GUI.Button(anotherRect, "Regenerate project files"))
             {
-                _projectGenerator.OnlyJobified = true;
                 _projectGenerator.Sync();
             }
         }
