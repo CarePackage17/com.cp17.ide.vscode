@@ -28,22 +28,6 @@ namespace VSCodeEditor
         bool SolutionExists();
     }
 
-    internal static class Extensions
-    {
-        public static UnsafeList<char> ToUnsafeList(this string source, Allocator allocator)
-        {
-            UnsafeList<char> data = new(source.Length, allocator);
-            unsafe
-            {
-                fixed (char* sourceStringPtr = source.AsSpan())
-                {
-                    data.AddRangeNoResize(sourceStringPtr, source.Length);
-                }
-            }
-            return data;
-        }
-    }
-
     public class ProjectGeneration : IGenerator
     {
         static readonly ProfilerMarker s_jobifiedSyncMarker = new($"{nameof(VSCodeEditor)}.{nameof(ProjectGeneration)}.{nameof(JobifiedSync)}");
@@ -648,6 +632,22 @@ namespace VSCodeEditor
         {
             var hash = mD5.ComputeHash(Encoding.Default.GetBytes(input));
             return new Guid(hash).ToString();
+        }
+    }
+
+        internal static class Extensions
+    {
+        public static UnsafeList<char> ToUnsafeList(this string source, Allocator allocator)
+        {
+            UnsafeList<char> data = new(source.Length, allocator);
+            unsafe
+            {
+                fixed (char* sourceStringPtr = source.AsSpan())
+                {
+                    data.AddRangeNoResize(sourceStringPtr, source.Length);
+                }
+            }
+            return data;
         }
     }
 }
